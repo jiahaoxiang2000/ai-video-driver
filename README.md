@@ -43,14 +43,22 @@ with more speakers by extending training corpus.
 **Zero-Shot Podcast Generation**
 <div align="center">
 
-<https://github.com/user-attachments/assets/2b99833e-d748-464e-af24-b5a1114cb041>
+
+
+https://github.com/user-attachments/assets/e68b1b7e-1329-47bb-a16f-8589cf227579
+
+
 
 </div>
 
 **Speaker-Specific Finetuned Podcast Generation**
 <div align="center">
 
-<https://github.com/user-attachments/assets/e5ae7610-a0ba-42a5-963a-e31575acac16>
+
+
+https://github.com/user-attachments/assets/21f626cb-eaf4-4f5c-920c-3d5d4c8cfa8b
+
+
 
 </div>
 
