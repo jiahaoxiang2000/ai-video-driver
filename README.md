@@ -36,7 +36,11 @@ with more speakers by extending training corpus.
 **Random Timbre Generation & Multilingual Support**
 <div align="center">
 
-<https://github.com/user-attachments/assets/c8f89693-5deb-47bc-abfe-5f46e09397fe>
+
+
+<https://github.com/user-attachments/assets/804e9e67-fb15-4557-9715-43cd46a1b3e8>
+
+
 
 </div>
 
