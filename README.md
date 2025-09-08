@@ -45,7 +45,7 @@ with more speakers by extending training corpus.
 
 
 
-https://github.com/user-attachments/assets/e68b1b7e-1329-47bb-a16f-8589cf227579
+<https://github.com/user-attachments/assets/e68b1b7e-1329-47bb-a16f-8589cf227579>
 
 
 
@@ -56,7 +56,7 @@ https://github.com/user-attachments/assets/e68b1b7e-1329-47bb-a16f-8589cf227579
 
 
 
-https://github.com/user-attachments/assets/21f626cb-eaf4-4f5c-920c-3d5d4c8cfa8b
+<https://github.com/user-attachments/assets/21f626cb-eaf4-4f5c-920c-3d5d4c8cfa8b>
 
 
 
