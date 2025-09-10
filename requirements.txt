@@ -2,3 +2,4 @@ torchtune
 torchao
 transformers
 einops
+gradio

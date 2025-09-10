@@ -75,9 +75,9 @@ For more examples, see [demo page](https://fireredteam.github.io/demos/firered_t
 
 ## Roadmap
 
-- [ ] 2025/09
+- [x] 2025/09
   - [x] Release the pre-trained checkpoints and inference code.
-  - [ ] Add web UI tool.
+  - [x] Add web UI tool.
 
 - [ ] 2025/10
   - [ ] Release a base model with enhanced multilingual support.
@@ -215,13 +215,21 @@ out_name = "chat_clone" + ".wav"
 torchaudio.save(out_name, all_audio, 24000)
 ```
 
+**Dialogue Generation with Web UI**
+
+Generate dialogue through an easy-to-use web interface that supports both voice cloning and randomized voices.
+
+```sh
+python gradio_demo.py --pretrained-dir "./pretrained_models/FireRedTTS2"
+```
+
 ## Acknowledgements
 
 - We thank [**Moshi**](https://github.com/kyutai-labs/moshi) and [**Sesame CSM**](https://github.com/SesameAILabs/csm) for their novel dual-transformer approach. Additionally, we adapted [**Sesame CSM's**](https://github.com/SesameAILabs/csm) structure and core inference code.
 
 - We referred to [**Qwen2.5-1.5B**](https://huggingface.co/Qwen/Qwen2.5-1.5B) text tokenizer solution.
 
-- We referred to [**Xcodec2**](https://github.com/zhenye234/X-Codec-2.0) Vocos-based acoustic decoder
+- We referred to [**Xcodec2**](https://github.com/zhenye234/X-Codec-2.0) Vocos-based acoustic decoder.
 
 ## ⚠️ Usage Disclaimer ❗️❗️❗️❗️❗️❗️
 
