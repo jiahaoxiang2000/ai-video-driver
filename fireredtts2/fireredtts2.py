@@ -20,6 +20,7 @@ class FireRedTTS2:
         llm_config_path = os.path.join(pretrained_dir, "config_llm.json")
         if gen_type == "monologue":
             llm_ckpt_path = os.path.join(pretrained_dir, "llm_pretrain.pt")
+            # llm_ckpt_path = os.path.join(pretrained_dir, "llm_posttrain.pt")
         else:
             llm_ckpt_path = os.path.join(pretrained_dir, "llm_posttrain.pt")
         codec_config_path = os.path.join(pretrained_dir, "config_codec.json")
@@ -58,6 +59,9 @@ class FireRedTTS2:
 
     def load_prompt_audio(self, audio_path) -> torch.Tensor:
         audio, audio_sr = torchaudio.load(audio_path)
+        # Audio must be single channel
+        if audio.shape[0] > 1:
+            audio = audio[0, :].unsqueeze(0)
         audio16k = torchaudio.functional.resample(audio, audio_sr, 16000)
         return audio16k
 
@@ -195,6 +199,62 @@ class FireRedTTS2:
         )
 
         return audio
+
+    def generate_single(
+        self, context: List[Segment], temperature: float = 0.9, topk: int = 20
+    ):
+        self._model.reset_caches()
+        max_generation_len = 400
+        tokens, tokens_mask = [], []
+        for segment in context:
+            segment_tokens, segment_tokens_mask = self._tokenize_segment(segment)
+            tokens.append(segment_tokens)
+            tokens_mask.append(segment_tokens_mask)
+
+        prompt_tokens = torch.cat(tokens, dim=0).long().to(self.device)
+        prompt_tokens_mask = torch.cat(tokens_mask, dim=0).bool().to(self.device)
+        prompt_tokens = prompt_tokens[:-3, :]
+        prompt_tokens_mask = prompt_tokens_mask[:-3, :]
+
+        samples = []
+        curr_tokens = prompt_tokens.unsqueeze(0)
+        curr_tokens_mask = prompt_tokens_mask.unsqueeze(0)
+        curr_pos = (
+            torch.arange(0, prompt_tokens.size(0)).unsqueeze(0).long().to(self.device)
+        )
+
+        num_token = 0
+        start_time = time.time()
+        for _ in range(max_generation_len):
+            sample = self._model.generate_frame(
+                curr_tokens, curr_tokens_mask, curr_pos, temperature, topk
+            )
+            # eos
+            if torch.all(sample == 0):
+                break
+
+            samples.append(sample)
+
+            curr_tokens = torch.cat(
+                [sample, torch.zeros(1, 1).long().to(self.device)], dim=1
+            ).unsqueeze(1)
+            curr_tokens_mask = torch.cat(
+                [
+                    torch.ones_like(sample).bool(),
+                    torch.zeros(1, 1).bool().to(self.device),
+                ],
+                dim=1,
+            ).unsqueeze(1)
+            curr_pos = curr_pos[:, -1:] + 1
+            num_token += 1
+            if num_token == 2:
+                end_time = time.time()
+                duration = end_time - start_time
+                print("---first pack duration:", duration)
+
+        gen_tokens = torch.stack(samples).permute(1, 2, 0)
+
+        return gen_tokens
 
     # @torch.inference_mode()
     # def generate_stream(
@@ -346,91 +406,44 @@ class FireRedTTS2:
     def generate_monologue(
         self, text, prompt_wav=None, prompt_text=None, temperature=0.75, topk=20
     ):
-        self._model.reset_caches()
-        max_generation_len = 400  # ~32s
-
         # step1. construct context
         if prompt_wav is not None:
             assert os.path.exists(prompt_wav)
             assert prompt_text is not None
-            prompt_text = clean_text(text=prompt_text.strip())
-            text = clean_text(text=text.strip())
 
-            # print("---prompt_text:", prompt_text)
-            # print("---text:", text)
+            all_generated_segments = []
+            all_storage_segments = []
+            prompt_segments = []
+            prompt_text = clean_text(text=prompt_text)
+            text = clean_text(text=text)
+            text_list = split_text(text=text, length=400)
 
-            input_text = prompt_text + text
-
-            prompt_a = self.prepare_prompt(
-                text=input_text, speaker="[S1]", audio_path=prompt_wav
-            )
-            # print("---prompt_a:", prompt_a)
-
-            context = [prompt_a]
-
-            tokens, tokens_mask = [], []
-            for segment in context:
-                segment_tokens, segment_tokens_mask = self._tokenize_segment(segment)
-                tokens.append(segment_tokens)
-                tokens_mask.append(segment_tokens_mask)
-
-            prompt_tokens = torch.cat(tokens, dim=0).long().to(self.device)
-            prompt_tokens_mask = torch.cat(tokens_mask, dim=0).bool().to(self.device)
-            prompt_tokens = prompt_tokens[:-3, :]
-            prompt_tokens_mask = prompt_tokens_mask[:-3, :]
-
-            samples = []
-            curr_tokens = prompt_tokens.unsqueeze(0)
-            curr_tokens_mask = prompt_tokens_mask.unsqueeze(0)
-            curr_pos = (
-                torch.arange(0, prompt_tokens.size(0))
-                .unsqueeze(0)
-                .long()
-                .to(self.device)
-            )
-
-            max_seq_len = 3100
-            max_context_len = max_seq_len - max_generation_len
-            if curr_tokens.size(1) >= max_context_len:
-                raise ValueError(
-                    f"Inputs too long, must be below max_seq_len - max_generation_len: {max_context_len}"
+            audio_list = []
+            for text in text_list:
+                text = clean_text(text=text)
+                input_text = prompt_text[:-1] + "," + text
+                prompt_a = self.prepare_prompt(
+                    text=input_text, speaker="[S1]", audio_path=prompt_wav
                 )
 
-            num_token = 0
-            start_time = time.time()
-            for _ in range(max_generation_len):
-                sample = self._model.generate_frame(
-                    curr_tokens, curr_tokens_mask, curr_pos, temperature, topk
-                )
-                # eos
-                if torch.all(sample == 0):
-                    break
+                context = [prompt_a]
 
-                samples.append(sample)
+                while True:
+                    gen_tokens = self.generate_single(
+                        context=context, temperature=temperature, topk=topk
+                    )
+                    if gen_tokens.shape[2] > 18:
+                        break
+                    # else:
+                    #     print("生成结果小于1s,重新跑")
 
-                curr_tokens = torch.cat(
-                    [sample, torch.zeros(1, 1).long().to(self.device)], dim=1
-                ).unsqueeze(1)
-                curr_tokens_mask = torch.cat(
-                    [
-                        torch.ones_like(sample).bool(),
-                        torch.zeros(1, 1).bool().to(self.device),
-                    ],
-                    dim=1,
-                ).unsqueeze(1)
-                curr_pos = curr_pos[:, -1:] + 1
-                num_token += 1
-                if num_token == 2:
-                    end_time = time.time()
-                    duration = end_time - start_time
-                    print("---first pack duration:", duration)
+                gen_tokens = gen_tokens[:, :, 2:]  # cut leading silence
+                audio = self._audio_tokenizer.decode(gen_tokens).squeeze(0).squeeze(0)
+                audio_list.append(audio.unsqueeze(0))
 
-            gen_tokens = torch.stack(samples).permute(1, 2, 0)
-            # print("---gen_tokens:\n", gen_tokens, gen_tokens.shape)
-            gen_tokens = gen_tokens[:, :, 1:]  # cut leading silence
-            audio = self._audio_tokenizer.decode(gen_tokens).squeeze(0).squeeze(0)
+            all_audio = torch.cat(tensors=audio_list, dim=1)
 
-            return audio
+            return all_audio
 
         else:
             # random speaker
@@ -443,4 +456,4 @@ class FireRedTTS2:
                 temperature=temperature,
                 topk=topk,
             )
-            return audio_tensor
+            return audio_tensor.unsqueeze(0)

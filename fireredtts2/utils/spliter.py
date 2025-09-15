@@ -3,7 +3,8 @@ import string
 
 SYMBOLS_MAPPING = {
     "\n": "",
-    "…": ".",
+    "\t": "",
+    "…": ",",
     "“": "'",
     "”": "'",
     "‘": "'",
@@ -23,19 +24,20 @@ SYMBOLS_MAPPING = {
     "《": "'",
     "》": "'",
     "—": "",
-    "～": "",
-    "~": "",
+    "～": "，",
+    "~": "，",
     "：": ",",
     "；": ",",
     ";": ",",
     ":": ",",
     '"': "",
-    "！": "。",
+    "！": "，",
     # "!": ".",
-    "————": "，",
-    "——": "，",
-    "—": "，",
+    "————": "",
+    "——": "",
+    "—": "",
     "……": "，",
+    "*": "",
 }
 
 REPLACE_SYMBOL_REGEX = re.compile(
@@ -285,48 +287,3 @@ def process_text_list(text_list):
         for chunk in result:
             new_text_list.append(speaker + chunk)
     return new_text_list
-
-
-if __name__ == "__main__":
-    # Test the split_text function
-
-    text = "This is a test sentence. This is another test sentence. And a third one."
-    print(split_text(text, 100))
-
-    # assert split_text(text, 50) == [
-    #     "This is a test sentence.",
-    #     "This is another test sentence. And a third one.",
-    # ]
-    # assert split_text("a,aaaaaa3.14", 10) == ["a,", "aaaaaa3.14"]
-    # assert split_text("   ", 10) == []
-    # assert split_text("a", 10) == ["a"]
-
-    print(split_text("a,aaaaaa3.14", 10))
-    print(split_text("   ", 10))
-    print(split_text("a", 10))
-
-    text = "This is a test sentence with only commas, and no dots, and no exclamation marks, and no question marks, and no newlines."
-    # assert split_text(text, 50) == [
-    #     "This is a test sentence with only commas,",
-    #     "and no dots, and no exclamation marks,",
-    #     "and no question marks, and no newlines.",
-    # ]
-
-    print(split_text(text, 100))
-
-    # text = "This is a test sentence This is a test sentence This is a test sentence. This is a test sentence, This is a test sentence, This is a test sentence."
-    # # First half split at " ", second half split at ","
-    # assert split_text(text, 50) == [
-    #     "This is a test sentence This is a test sentence",
-    #     "This is a test sentence. This is a test sentence,",
-    #     "This is a test sentence, This is a test sentence.",
-    # ]
-
-    text = "这是一段很长的中文文本,而且没有句号,也没有感叹号,也没有问号,也没有换行符。"
-    # assert split_text(text, 50) == [
-    #     "这是一段很长的中文文本,",
-    #     "而且没有句号,也没有感叹号,",
-    #     "也没有问号,也没有换行符.",
-    # ]
-
-    print(split_text(text, 100))
