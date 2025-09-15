@@ -36,33 +36,21 @@ with more speakers by extending training corpus.
 **Random Timbre Generation & Multilingual Support**
 <div align="center">
 
-
-
 <https://github.com/user-attachments/assets/804e9e67-fb15-4557-9715-43cd46a1b3e8>
-
-
 
 </div>
 
 **Zero-Shot Podcast Generation**
 <div align="center">
 
-
-
 <https://github.com/user-attachments/assets/e68b1b7e-1329-47bb-a16f-8589cf227579>
-
-
 
 </div>
 
 **Speaker-Specific Finetuned Podcast Generation**
 <div align="center">
 
-
-
 <https://github.com/user-attachments/assets/21f626cb-eaf4-4f5c-920c-3d5d4c8cfa8b>
-
-
 
 </div>
 
@@ -70,7 +58,8 @@ For more examples, see [demo page](https://fireredteam.github.io/demos/firered_t
 
 ## News
 
-- [2025/09/08] 🔥 **We release the [pre-trained checkpoints](https://huggingface.co/FireRedTeam/FireRedTTS2) and inference code.**
+- [2025/09/12] 🔥 **We have added a UI tool to the dialogue generation.**
+- [2025/09/08] 🔥 We release the [pre-trained checkpoints](https://huggingface.co/FireRedTeam/FireRedTTS2) and inference code.
 - [2025/09/02] 🔥 We release the [technical report](https://arxiv.org/abs/2509.02020) and [demo page](https://fireredteam.github.io/demos/firered_tts_2/)
 
 ## Roadmap
@@ -118,57 +107,21 @@ For more examples, see [demo page](https://fireredteam.github.io/demos/firered_t
 
 ## Basic Usage
 
-**Monologue Generation**
+**Dialogue Generation with Web UI**
 
-```python
-import os
-import sys
-import torch
-import torchaudio
-from fireredtts2.fireredtts2 import FireRedTTS2
+Generate dialogue through an easy-to-use web interface that supports both voice cloning and randomized voices.
 
-device = "cuda"
-lines = [
-    "Hello everyone, welcome to our newly launched FireRedTTS2. It supports multiple languages including English, Chinese, Japanese, Korean, French, German, and Russian. Additionally, this TTS model features long-context dialogue generation capabilities.",
-    "如果你厌倦了千篇一律的AI音色，不满意于其他模型语言支持不够丰富，那么本项目将会成为你绝佳的工具。",
-    "ランダムな話者と言語を選択して合成できます",
-    "이는 많은 인공지능 시스템에 유용합니다. 예를 들어, 제가 다양한 음성 데이터를 대량으로 생성해 여러분의 ASR 모델이나 대화 모델에 풍부한 데이터를 제공할 수 있습니다.",
-    "J'évolue constamment et j'espère pouvoir parler davantage de langues avec plus d'aisance à l'avenir.",
-]
-
-fireredtts2 = FireRedTTS2(
-    pretrained_dir="./pretrained_models/FireRedTTS2",
-    gen_type="monologue",
-    device=device,
-)
-
-# random speaker
-for i in range(len(lines)):
-    text = lines[i].strip()
-    audio = fireredtts2.generate_monologue(text=text)
-    # adjust temperature & topk
-    # audio = fireredtts2.generate_monologue(text=text, temperature=0.8, topk=30)
-    out_name = str(i) + ".wav"
-    all_audio = audio.unsqueeze(0).cpu()
-    torchaudio.save(out_name, all_audio, 24000)
-
-
-# # voice clone
-# for i in range(len(lines)):
-#     text = lines[i].strip()
-
-#     audio = fireredtts2.generate_monologue(
-#         text=text,
-#         prompt_wav=<prompt_wav_path>,
-#         prompt_text=<prompt_wav_text>,
-#         temperature=0.75,
-#         topk=20,
-#     )
-
-#     out_name = str(i)  + ".wav"
-#     all_audio = audio.unsqueeze(0).cpu()
-#     torchaudio.save(out_name, all_audio, 24000)
+```sh
+python gradio_demo.py --pretrained-dir "./pretrained_models/FireRedTTS2"
 ```
+
+<div align="center">
+
+<p>
+<img src="assets/gradio.png" alt="FireRedTTS_Logo" style="width: 997px; height: 515px;">
+</p>
+
+</div>
 
 **Dialogue Generation**
 
@@ -211,16 +164,52 @@ all_audio = fireredtts2.generate_dialogue(
     temperature=0.9,
     topk=30,
 )
-out_name = "chat_clone" + ".wav"
-torchaudio.save(out_name, all_audio, 24000)
+torchaudio.save("chat_clone.wav", all_audio, 24000)
 ```
 
-**Dialogue Generation with Web UI**
+**Monologue Generation**
 
-Generate dialogue through an easy-to-use web interface that supports both voice cloning and randomized voices.
+```python
+import os
+import sys
+import torch
+import torchaudio
+from fireredtts2.fireredtts2 import FireRedTTS2
 
-```sh
-python gradio_demo.py --pretrained-dir "./pretrained_models/FireRedTTS2"
+device = "cuda"
+lines = [
+    "Hello everyone, welcome to our newly launched FireRedTTS2. It supports multiple languages including English, Chinese, Japanese, Korean, French, German, and Russian. Additionally, this TTS model features long-context dialogue generation capabilities.",
+    "如果你厌倦了千篇一律的AI音色，不满意于其他模型语言支持不够丰富，那么本项目将会成为你绝佳的工具。",
+    "ランダムな話者と言語を選択して合成できます",
+    "이는 많은 인공지능 시스템에 유용합니다. 예를 들어, 제가 다양한 음성 데이터를 대량으로 생성해 여러분의 ASR 모델이나 대화 모델에 풍부한 데이터를 제공할 수 있습니다.",
+    "J'évolue constamment et j'espère pouvoir parler davantage de langues avec plus d'aisance à l'avenir.",
+]
+
+fireredtts2 = FireRedTTS2(
+    pretrained_dir="./pretrained_models/FireRedTTS2",
+    gen_type="monologue",
+    device=device,
+)
+
+# random speaker
+for i in range(len(lines)):
+    text = lines[i].strip()
+    audio = fireredtts2.generate_monologue(text=text)
+    # adjust temperature & topk
+    # audio = fireredtts2.generate_monologue(text=text, temperature=0.8, topk=30)
+    torchaudio.save(str(i) + ".wav", audio.cpu(), 24000)
+
+
+# # voice clone
+# for i in range(len(lines)):
+#     text = lines[i].strip()
+
+#     audio = fireredtts2.generate_monologue(
+#         text=text,
+#         prompt_wav=<prompt_wav_path>,
+#         prompt_text=<prompt_wav_text>,
+#     )
+#     torchaudio.save(str(i) + ".wav", audio.cpu(), 24000)
 ```
 
 ## Acknowledgements
