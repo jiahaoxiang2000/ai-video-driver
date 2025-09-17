@@ -48,6 +48,10 @@ with more speakers by extending training corpus.
 </div>
 
 **Speaker-Specific Finetuned Podcast Generation**
+
+⚠️ Speaker voices: hosts "肥杰" and "惠子" from the podcast "肥话连篇". Use without authorization is forbidden.
+
+⚠️ 声音来源：播客 "肥话连篇" 主播 "肥杰" 和 "惠子"，未经授权不能使用。
 <div align="center">
 
 <https://github.com/user-attachments/assets/21f626cb-eaf4-4f5c-920c-3d5d4c8cfa8b>
