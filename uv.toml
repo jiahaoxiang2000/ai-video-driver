@@ -1,0 +1,12 @@
+# Use Tsinghua University PyPI mirror for faster downloads in China
+index-url = "https://mirrors.tuna.tsinghua.edu.cn/pypi/web/simple"
+
+# Alternative mirrors (uncomment to use):
+# Alibaba Cloud mirror
+# index-url = "https://mirrors.aliyun.com/pypi/simple"
+
+# Douban mirror
+# index-url = "https://pypi.douban.com/simple"
+
+# USTC mirror
+# index-url = "https://mirrors.ustc.edu.cn/pypi/web/simple"

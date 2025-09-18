@@ -1,0 +1,18 @@
+[project]
+name = "fireredtts2"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.9, <3.13"
+dependencies = [
+    "torch==2.7.1",
+    "torchvision==0.22.1",
+    "torchaudio==2.7.1",
+    "torchtune>=0.6.1",
+    "torchao>=0.13.0",
+    "transformers>=4.56.1",
+    "einops>=0.8.1",
+    "gradio>=4.44.1",
+    "soundfile>=0.13.1",
+    "librosa>=0.11.0",
+]
