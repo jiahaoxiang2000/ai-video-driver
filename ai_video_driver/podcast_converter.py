@@ -54,15 +54,7 @@ class PodcastConverter:
 
         try:
             # Create conversion prompt
-            # Optimize content for better prompt size management
-            optimized_content = self._optimize_prompt_size(repo_content)
-            prompt = self._create_conversion_prompt(optimized_content, style, length)
-
-            # Log prompt statistics
-            estimated_tokens = self._estimate_prompt_tokens(prompt)
-            logger.debug(
-                f"Generated prompt: {len(prompt)} chars, ~{estimated_tokens} tokens"
-            )
+            prompt = self._create_conversion_prompt(repo_content, style, length)
 
             # Use Claude Code CLI with -p flag for non-interactive output
             result = subprocess.run(
