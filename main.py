@@ -17,7 +17,7 @@ from ai_video_driver import (
     setup_pipeline_logging,
     PipelineTimer,
     log_file_info,
-    config
+    config,
 )
 
 
@@ -36,6 +36,10 @@ def main():
         "[S1]嗯，最近发现了一个很厉害的TTS系统叫FireRedTTS2。它最大的特点就是可以generate long conversational speech，支持multi-speaker dialogue generation。",
         "[S2]真的吗？那它跟其他的TTS有什么不同呢？",
         "[S1]这个system很特别，它可以支持3分钟的dialogue with 4 speakers，而且还有ultra-low latency。在L20 GPU上，first-packet latency只要140ms。最重要的是它支持multi lingual，包括English、Chinese、Japanese、Korean、French、German还有Russian。",
+        "[S2]听起来很powerful啊。那它还有什么其他features吗？",
+        "[S1]对，它还有zero-shot voice cloning功能，可以做cross-lingual和code-switching scenarios。而且还有random timbre generation，这个对creating ASR data很有用。最关键是stability很强，在monologue和dialogue tests里都有high similarity和low WER/CER。",
+        "[S2]那这个是open source的吗？",
+        "[S1]是的，它基于Apache 2.0 license。你可以在GitHub上找到FireRedTeam/FireRedTTS2，还有pre-trained checkpoints在Hugging Face上。不过要注意，voice cloning功能只能用于academic research purposes。",
     ]
 
     prompt_wav_list = [
@@ -72,17 +76,14 @@ def main():
                 text_list=text_list,
                 prompt_wav_list=prompt_wav_list,
                 prompt_text_list=prompt_text_list,
-                temperature=config['audio'].DEFAULT_TEMPERATURE,
-                topk=config['audio'].DEFAULT_TOPK,
+                temperature=config["audio"].DEFAULT_TEMPERATURE,
+                topk=config["audio"].DEFAULT_TOPK,
             )
 
         # Step 4: Save audio and SRT files
         with PipelineTimer("Save audio and subtitle files", logger):
             audio_file, srt_file = save_files(
-                output_dir,
-                all_audio,
-                srt_text,
-                config['audio'].SAMPLE_RATE
+                output_dir, all_audio, srt_text, config["audio"].SAMPLE_RATE
             )
 
         log_file_info(audio_file, logger, "🎵")
@@ -90,26 +91,28 @@ def main():
 
         # Step 5: Generate video from SRT
         with PipelineTimer("Generate video animation from subtitles", logger):
-            video_file = generate_video_from_srt(srt_text, audio_file, output_dir, temp_dir)
+            video_file = generate_video_from_srt(
+                srt_text, audio_file, output_dir, temp_dir
+            )
 
         if video_file and video_file.exists():
             log_file_info(video_file, logger, "🎬")
 
             # Step 6: Combine audio with video
             with PipelineTimer("Combine audio and video", logger):
-                final_video = output_dir / config['files'].FINAL_VIDEO_FILENAME
+                final_video = output_dir / config["files"].FINAL_VIDEO_FILENAME
                 success = combine_audio_video(audio_file, video_file, final_video)
 
             if success and final_video.exists():
                 # Pipeline completed successfully
                 total_time = time.time() - pipeline_start
 
-                logger.info("="*60)
+                logger.info("=" * 60)
                 logger.info("🎉 PIPELINE COMPLETED SUCCESSFULLY!")
                 logger.info(f"📁 Output directory: {output_dir}")
                 log_file_info(final_video, logger, "🎬")
                 logger.info(f"⏱️  Total processing time: {total_time:.2f} seconds")
-                logger.info("="*60)
+                logger.info("=" * 60)
 
                 # Log all output files
                 logger.info("📋 Generated files:")

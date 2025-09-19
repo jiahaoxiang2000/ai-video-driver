@@ -7,12 +7,14 @@ import re
 import logging
 from pathlib import Path
 import torchaudio
+from .config import config as app_config
 from manim import (
     Scene,
     Text,
     VGroup,
     Write,
     FadeOut,
+    AnimationGroup,
     config,
     BLUE,
     GREEN,
@@ -65,7 +67,9 @@ def parse_srt_for_manim(srt_content):
             "speaker": speaker,
         }
         subtitles.append(subtitle_data)
-        logger.debug(f"Parsed subtitle: {speaker} at {start_sec:.2f}s: {clean_text[:50]}...")
+        logger.debug(
+            f"Parsed subtitle: {speaker} at {start_sec:.2f}s: {clean_text[:50]}..."
+        )
 
     logger.info(f"Successfully parsed {len(subtitles)} subtitles")
     return subtitles
@@ -78,30 +82,61 @@ class DialogueScene(Scene):
         super().__init__(**kwargs)
         self.subtitles = subtitles
         self.audio_duration = audio_duration
-        logger.debug(f"Initialized DialogueScene with {len(subtitles)} subtitles, duration: {audio_duration:.2f}s")
+        logger.debug(
+            f"Initialized DialogueScene with {len(subtitles)} subtitles, duration: {audio_duration:.2f}s"
+        )
 
     def construct(self):
         logger.info("Starting Manim scene construction")
 
-        # Speaker colors
-        speaker_colors = {"S1": BLUE, "S2": GREEN, "S3": YELLOW, "S4": PURPLE}
+        # Speaker colors from config
+        speaker_colors = {
+            "S1": app_config["video"].SPEAKER_COLORS.get("S1", "#3498db"),
+            "S2": app_config["video"].SPEAKER_COLORS.get("S2", "#2ecc71"),
+            "S3": app_config["video"].SPEAKER_COLORS.get("S3", "#f1c40f"),
+            "S4": app_config["video"].SPEAKER_COLORS.get("S4", "#9b59b6"),
+        }
         current_texts = []
 
-        for i, subtitle in enumerate(self.subtitles):
-            logger.debug(f"Processing subtitle {i+1}/{len(self.subtitles)}: {subtitle['speaker']}")
+        # Screen configuration
+        screen_height = config.frame_height
+        max_visible_height = screen_height * 0.8  # Use 80% of screen height
+        line_height = 0.8  # Approximate height per line including spacing
+        max_visible_lines = int(max_visible_height / line_height)
 
-            # Create text object
+        for i, subtitle in enumerate(self.subtitles):
+            logger.debug(
+                f"Processing subtitle {i+1}/{len(self.subtitles)}: {subtitle['speaker']}"
+            )
+
+            # Create text object with wrapping
             speaker_color = speaker_colors.get(subtitle["speaker"], WHITE)
 
             # Speaker label
             speaker_label = Text(
-                f"{subtitle['speaker']}:", font_size=24, color=speaker_color
+                f"{subtitle['speaker']}:",
+                font_size=app_config["video"].SPEAKER_FONT_SIZE,
+                color=speaker_color,
             ).to_edge(LEFT, buff=0.5)
 
-            # Main text
-            main_text = Text(
-                subtitle["text"], font_size=20, color=WHITE, line_spacing=0.5
-            ).next_to(speaker_label, RIGHT, buff=0.3)
+            # Calculate available width for main text
+            available_width = (
+                config.frame_width - speaker_label.width - 1.0
+            )  # Leave some margin
+
+            # Create main text with wrapping
+            main_text = self._create_wrapped_text(
+                subtitle["text"],
+                max_width=available_width,
+                font_size=app_config["video"].TEXT_FONT_SIZE,
+                color=WHITE,
+            )
+
+            # Position main text next to speaker label
+            main_text.next_to(speaker_label, RIGHT, buff=0.3)
+
+            # Align the top of main text with speaker label
+            main_text.align_to(speaker_label, UP)
 
             # Group speaker and text
             full_text = VGroup(speaker_label, main_text)
@@ -112,21 +147,48 @@ class DialogueScene(Scene):
             else:
                 full_text.to_edge(UP, buff=1)
 
-            # Animate text appearance
-            write_duration = min(0.5, subtitle["duration"] * 0.3)
-            self.play(Write(full_text), run_time=write_duration)
+            current_texts.append(full_text)
+
+            # Check if we need to scroll
+            total_height = sum(text.height + 0.3 for text in current_texts)
+
+            if total_height > max_visible_height and len(current_texts) > 1:
+                # Calculate how much we need to scroll up to make room for new text
+                excess_height = total_height - max_visible_height
+
+                # First scroll existing texts (excluding the new one) up smoothly
+                scroll_animations = []
+                for text in current_texts[:-1]:  # Exclude the newly added text
+                    scroll_animations.append(text.animate.shift(UP * excess_height))
+
+                if scroll_animations:
+                    self.play(AnimationGroup(*scroll_animations), run_time=0.5)
+
+                # Position the new text at the scrolled position
+                full_text.shift(UP * excess_height)
+
+                # Then write the new text
+                write_duration = min(0.5, subtitle["duration"] * 0.3)
+                self.play(Write(full_text), run_time=write_duration)
+            else:
+                # Normal text appearance without scrolling
+                write_duration = min(0.5, subtitle["duration"] * 0.3)
+                self.play(Write(full_text), run_time=write_duration)
 
             # Hold text for remaining duration
             hold_time = subtitle["duration"] - write_duration
             if hold_time > 0:
                 self.wait(hold_time)
 
-            current_texts.append(full_text)
+            # Remove texts that have scrolled off screen
+            texts_to_remove = []
+            for text in current_texts:
+                if text.get_bottom()[1] > screen_height / 2:  # Above visible area
+                    texts_to_remove.append(text)
 
-            # Fade older texts if screen gets crowded
-            if len(current_texts) > 4:
-                old_text = current_texts.pop(0)
-                self.play(FadeOut(old_text), run_time=0.3)
+            for text in texts_to_remove:
+                current_texts.remove(text)
+                self.remove(text)
 
         # Wait for any remaining audio
         final_wait = max(
@@ -137,6 +199,50 @@ class DialogueScene(Scene):
             self.wait(final_wait)
 
         logger.info("Completed Manim scene construction")
+
+    def _create_wrapped_text(self, text, max_width, font_size=None, color=WHITE):
+        """Create text with word wrapping to fit within max_width"""
+        if font_size is None:
+            font_size = app_config["video"].TEXT_FONT_SIZE
+        words = text.split()
+        lines = []
+        current_line = []
+
+        # Create a test text to measure width
+        test_text = Text("", font_size=font_size)
+
+        for word in words:
+            test_line = " ".join(current_line + [word])
+            test_text.become(Text(test_line, font_size=font_size))
+
+            if test_text.width <= max_width:
+                current_line.append(word)
+            else:
+                if current_line:  # If current line has words, start new line
+                    lines.append(" ".join(current_line))
+                    current_line = [word]
+                else:  # If single word is too long, add it anyway
+                    lines.append(word)
+                    current_line = []
+
+        # Add remaining words
+        if current_line:
+            lines.append(" ".join(current_line))
+
+        # Create VGroup of text lines
+        text_lines = []
+        for line in lines:
+            text_line = Text(line, font_size=font_size, color=color)
+            text_lines.append(text_line)
+
+        if text_lines:
+            # Arrange lines vertically
+            wrapped_text = VGroup(*text_lines)
+            wrapped_text.arrange(DOWN, aligned_edge=LEFT, buff=0.1)
+            return wrapped_text
+        else:
+            # Return empty text if no content
+            return Text("", font_size=font_size, color=color)
 
 
 def generate_video_from_srt(srt_content, audio_file, output_dir, temp_dir):
@@ -180,11 +286,15 @@ def generate_video_from_srt(srt_content, audio_file, output_dir, temp_dir):
         logger.info("Attempting to recover using partial video files")
 
         # Try to combine partial video files manually using ffmpeg
-        partial_dir = temp_dir / "videos" / "720p30" / "partial_movie_files" / "DialogueScene"
+        partial_dir = (
+            temp_dir / "videos" / "720p30" / "partial_movie_files" / "DialogueScene"
+        )
         if partial_dir.exists():
             partial_files = sorted(list(partial_dir.glob("*.mp4")))
             if partial_files:
-                logger.info(f"Found {len(partial_files)} partial video files, combining manually...")
+                logger.info(
+                    f"Found {len(partial_files)} partial video files, combining manually..."
+                )
 
                 # Create file list for ffmpeg concat
                 filelist_path = temp_dir / "filelist.txt"
@@ -199,7 +309,9 @@ def generate_video_from_srt(srt_content, audio_file, output_dir, temp_dir):
                 result = os.system(concat_cmd)
 
                 if result == 0 and video_file.exists():
-                    logger.info(f"Successfully combined partial files into: {video_file}")
+                    logger.info(
+                        f"Successfully combined partial files into: {video_file}"
+                    )
                     return video_file
                 else:
                     logger.error("Failed to combine partial video files")
