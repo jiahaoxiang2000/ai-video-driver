@@ -1,5 +1,5 @@
 [project]
-name = "fireredtts2"
+name = "ai-video-driver"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
@@ -15,4 +15,5 @@ dependencies = [
     "gradio>=4.44.1",
     "soundfile>=0.13.1",
     "librosa>=0.11.0",
+    "manim>=0.18.0",
 ]
