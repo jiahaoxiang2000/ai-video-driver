@@ -9,6 +9,8 @@ from pathlib import Path
 from typing import Optional, Dict, Any, List
 from urllib.parse import urlparse
 import json
+import datetime
+from bs4 import BeautifulSoup
 
 logger = logging.getLogger(__name__)
 
@@ -16,14 +18,19 @@ logger = logging.getLogger(__name__)
 class GitHubContentFetcher:
     """Fetches content from GitHub repositories for podcast generation"""
 
-    def __init__(self, github_token: Optional[str] = None, cache_dir: Optional[Path] = None):
+    def __init__(
+        self, github_token: Optional[str] = None, cache_dir: Optional[Path] = None
+    ):
         self.github_token = github_token
         self.cache_dir = cache_dir or Path.home() / ".cache" / "ai_video_driver"
         self.cache_dir.mkdir(parents=True, exist_ok=True)
 
+        # Track recorded repositories
+        self.recorded_repos_file = self.cache_dir / "recorded_repos.json"
+
         self.headers = {
             "Accept": "application/vnd.github.v3+json",
-            "User-Agent": "AI-Video-Driver/1.0"
+            "User-Agent": "AI-Video-Driver/1.0",
         }
 
         if self.github_token:
@@ -31,42 +38,164 @@ class GitHubContentFetcher:
 
         logger.info(f"Initialized GitHub fetcher with cache dir: {self.cache_dir}")
 
-    def get_trending_repos(self, language: str = "python", limit: int = 10) -> List[Dict[str, Any]]:
-        """Fetch trending repositories from GitHub"""
-        logger.info(f"Fetching trending {language} repositories")
-
-        cache_file = self.cache_dir / f"trending_{language}_{limit}.json"
-
-        # Check cache (1 hour expiry)
-        if cache_file.exists() and (time.time() - cache_file.stat().st_mtime) < 3600:
-            logger.debug("Using cached trending repositories")
-            with open(cache_file, 'r') as f:
-                return json.load(f)
+    def _load_recorded_repos(self) -> Dict[str, datetime.datetime]:
+        """Load previously recorded repositories with their timestamps"""
+        if not self.recorded_repos_file.exists():
+            return {}
 
         try:
-            # Search for trending repos (created in last week, sorted by stars)
-            url = "https://api.github.com/search/repositories"
-            params = {
-                "q": f"language:{language} created:>{self._get_week_ago_date()}",
-                "sort": "stars",
-                "order": "desc",
-                "per_page": limit
+            with open(self.recorded_repos_file, "r") as f:
+                data = json.load(f)
+
+            # Convert string timestamps back to datetime objects
+            recorded_repos = {}
+            for repo_id, timestamp_str in data.items():
+                recorded_repos[repo_id] = datetime.datetime.fromisoformat(timestamp_str)
+
+            return recorded_repos
+        except Exception as e:
+            logger.error(f"Failed to load recorded repos: {e}")
+            return {}
+
+    def _save_recorded_repos(self, recorded_repos: Dict[str, datetime.datetime]):
+        """Save recorded repositories with timestamps"""
+        try:
+            # Convert datetime objects to strings for JSON serialization
+            data = {}
+            for repo_id, timestamp in recorded_repos.items():
+                data[repo_id] = timestamp.isoformat()
+
+            with open(self.recorded_repos_file, "w") as f:
+                json.dump(data, f, indent=2)
+        except Exception as e:
+            logger.error(f"Failed to save recorded repos: {e}")
+
+    def mark_repo_as_recorded(self, repo_id: str):
+        """Mark a repository as recorded with current timestamp"""
+        recorded_repos = self._load_recorded_repos()
+        recorded_repos[repo_id] = datetime.datetime.now()
+        self._save_recorded_repos(recorded_repos)
+        logger.info(f"Marked {repo_id} as recorded")
+
+    def _is_repo_recently_recorded(self, repo_id: str, days_threshold: int = 7) -> bool:
+        """Check if a repository was recorded within the threshold period"""
+        recorded_repos = self._load_recorded_repos()
+
+        if repo_id not in recorded_repos:
+            return False
+
+        recorded_time = recorded_repos[repo_id]
+        time_diff = datetime.datetime.now() - recorded_time
+
+        return time_diff.days <= days_threshold
+
+    def get_top5_unrecorded_trending_repos(self) -> List[Dict[str, Any]]:
+        """Fetch top 5 trending repositories from GitHub trending page, skipping recently recorded ones"""
+        logger.info(
+            "Fetching top 5 unrecorded trending repositories from GitHub trending page"
+        )
+
+        try:
+            # Fetch GitHub trending page
+            trending_url = "https://github.com/trending"
+            headers = {
+                "User-Agent": "AI-Video-Driver/1.0",
+                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
             }
 
-            response = requests.get(url, headers=self.headers, params=params, timeout=30)
+            response = requests.get(trending_url, headers=headers, timeout=30)
             response.raise_for_status()
 
-            repos = response.json().get("items", [])
+            # Parse the HTML content
+            soup = BeautifulSoup(response.content, "html.parser")
 
-            # Cache the results
-            with open(cache_file, 'w') as f:
-                json.dump(repos, f, indent=2)
+            # Find trending repositories
+            trending_repos = []
+            repo_articles = soup.find_all("article", {"class": "Box-row"})
 
-            logger.info(f"Fetched {len(repos)} trending repositories")
-            return repos
+            for article in repo_articles:
+                try:
+                    # Extract repository name and owner
+                    h2_elem = article.find("h2", {"class": "h3"})
+                    if not h2_elem:
+                        continue
+
+                    repo_link = h2_elem.find("a")
+                    if not repo_link:
+                        continue
+
+                    repo_path = repo_link.get("href", "")
+                    if repo_path:
+                        repo_path = repo_path.strip("/")
+
+                    repo_parts = repo_path.split("/")
+                    if len(repo_parts) != 2:
+                        continue
+
+                    owner, repo_name = repo_parts
+                    repo_id = f"{owner}/{repo_name}"
+
+                    # Skip if recently recorded
+                    if self._is_repo_recently_recorded(repo_id):
+                        logger.debug(f"Skipping recently recorded repo: {repo_id}")
+                        continue
+
+                    # Extract additional info
+                    description_elem = article.find("p", {"class": "col-9"})
+                    description = (
+                        description_elem.get_text(strip=True)
+                        if description_elem
+                        else ""
+                    )
+
+                    # Extract language
+                    language_elem = article.find(
+                        "span", attrs={"itemprop": "programmingLanguage"}
+                    )
+                    language = (
+                        language_elem.get_text(strip=True) if language_elem else ""
+                    )
+
+                    # Extract stars count
+                    stars_elem = article.find(
+                        "a", attrs={"href": f"/{repo_id}/stargazers"}
+                    )
+                    stars = 0
+                    if stars_elem:
+                        stars_text = stars_elem.get_text(strip=True).replace(",", "")
+                        try:
+                            stars = int(stars_text)
+                        except (ValueError, TypeError):
+                            stars = 0
+
+                    repo_info = {
+                        "name": repo_name,
+                        "full_name": repo_id,
+                        "owner": {"login": owner},
+                        "description": description,
+                        "language": language,
+                        "stargazers_count": stars,
+                        "html_url": f"https://github.com/{repo_id}",
+                        "topics": [],  # GitHub trending page doesn't show topics
+                    }
+
+                    trending_repos.append(repo_info)
+
+                    # Stop when we have 5 unrecorded repos
+                    if len(trending_repos) >= 5:
+                        break
+
+                except Exception as e:
+                    logger.warning(
+                        f"Failed to parse repository from trending page: {e}"
+                    )
+                    continue
+
+            logger.info(f"Found {len(trending_repos)} unrecorded trending repositories")
+            return trending_repos
 
         except Exception as e:
-            logger.error(f"Failed to fetch trending repositories: {e}")
+            logger.error(f"Failed to fetch trending repositories from GitHub page: {e}")
             return []
 
     def fetch_repository_content(self, repo_url: str) -> Optional[Dict[str, str]]:
@@ -79,7 +208,7 @@ class GitHubContentFetcher:
             if "github.com" not in parsed.netloc:
                 raise ValueError("Not a GitHub URL")
 
-            path_parts = parsed.path.strip('/').split('/')
+            path_parts = parsed.path.strip("/").split("/")
             if len(path_parts) < 2:
                 raise ValueError("Invalid GitHub repository URL format")
 
@@ -87,9 +216,12 @@ class GitHubContentFetcher:
 
             # Check cache (1 hour expiry)
             cache_file = self.cache_dir / f"{owner}_{repo}_content.json"
-            if cache_file.exists() and (time.time() - cache_file.stat().st_mtime) < 3600:
+            if (
+                cache_file.exists()
+                and (time.time() - cache_file.stat().st_mtime) < 3600
+            ):
                 logger.debug("Using cached repository content")
-                with open(cache_file, 'r') as f:
+                with open(cache_file, "r") as f:
                     return json.load(f)
 
             # Fetch repository info
@@ -109,11 +241,11 @@ class GitHubContentFetcher:
                 "readme": readme_content or "",
                 "url": repo_url,
                 "owner": owner,
-                "repo": repo
+                "repo": repo,
             }
 
             # Cache the results
-            with open(cache_file, 'w') as f:
+            with open(cache_file, "w") as f:
                 json.dump(content, f, indent=2)
 
             logger.info(f"Successfully fetched content for {owner}/{repo}")
@@ -138,7 +270,14 @@ class GitHubContentFetcher:
         """Fetch README content from repository"""
         try:
             # Try common README filenames
-            readme_files = ["README.md", "readme.md", "README.rst", "readme.rst", "README.txt", "readme.txt"]
+            readme_files = [
+                "README.md",
+                "readme.md",
+                "README.rst",
+                "readme.rst",
+                "README.txt",
+                "readme.txt",
+            ]
 
             for readme_file in readme_files:
                 try:
@@ -149,7 +288,10 @@ class GitHubContentFetcher:
                         content_data = response.json()
                         if content_data.get("encoding") == "base64":
                             import base64
-                            content = base64.b64decode(content_data["content"]).decode('utf-8')
+
+                            content = base64.b64decode(content_data["content"]).decode(
+                                "utf-8"
+                            )
                             logger.debug(f"Successfully fetched {readme_file}")
                             return content
 
@@ -166,6 +308,7 @@ class GitHubContentFetcher:
     def _get_week_ago_date(self) -> str:
         """Get date string for one week ago"""
         import datetime
+
         week_ago = datetime.datetime.now() - datetime.timedelta(days=7)
         return week_ago.strftime("%Y-%m-%d")
 

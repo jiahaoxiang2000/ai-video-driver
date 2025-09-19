@@ -29,17 +29,19 @@ class TestGitHubContentFetcher(unittest.TestCase):
 
         shutil.rmtree(self.temp_dir, ignore_errors=True)
 
-    def test_get_trending_repos_success(self):
-        """Test successful trending repositories fetch with real API"""
-        repos = self.fetcher.get_trending_repos(language="python", limit=5)
+    def test_get_top5_unrecorded_trending_repos_success(self):
+        """Test successful top 5 unrecorded trending repositories fetch"""
+        repos = self.fetcher.get_top5_unrecorded_trending_repos()
 
-        print(f"\nFetched {len(repos)} repositories:")
+        print(f"\nFetched {len(repos)} unrecorded trending repositories:")
         for i, repo in enumerate(repos):
             print(
                 f"  {i+1}. {repo.get('full_name', 'Unknown')} - {repo.get('stargazers_count', 0)} stars"
             )
 
         self.assertIsInstance(repos, list)
+        self.assertLessEqual(len(repos), 5)  # Should return at most 5 repos
+
         if repos:  # Only test if we got results
             repo = repos[0]
             self.assertIn("name", repo)
@@ -88,18 +90,78 @@ class TestGitHubContentFetcher(unittest.TestCase):
         self.assertIn("test, python", summary)
         self.assertIn("# Test Repository", summary)
 
-    def test_cache_functionality(self):
-        """Test caching mechanism"""
-        # Create a mock cache file
-        cache_file = self.temp_dir / "trending_python_10.json"
-        test_data = [{"name": "cached-repo"}]
+    def test_recorded_repos_tracking(self):
+        """Test recorded repositories tracking functionality"""
+        repo_id = "test/repo"
 
-        with open(cache_file, "w") as f:
-            json.dump(test_data, f)
+        # Initially should not be recorded
+        self.assertFalse(self.fetcher._is_repo_recently_recorded(repo_id))
 
-        # This should return cached data
-        repos = self.fetcher.get_trending_repos()
-        self.assertEqual(repos[0]["name"], "cached-repo")
+        # Mark as recorded
+        self.fetcher.mark_repo_as_recorded(repo_id)
+
+        # Now should be recorded
+        self.assertTrue(self.fetcher._is_repo_recently_recorded(repo_id))
+
+        # Test with custom threshold
+        self.assertTrue(self.fetcher._is_repo_recently_recorded(repo_id, days_threshold=1))
+
+        # For threshold=0, it should still return True since it was recorded today (day 0)
+        # A better test is to use a negative threshold or test edge cases differently
+        self.assertTrue(self.fetcher._is_repo_recently_recorded(repo_id, days_threshold=0))
+
+    def test_recorded_repos_persistence(self):
+        """Test that recorded repositories persist across instances"""
+        repo_id = "test/persistent-repo"
+
+        # Mark as recorded in first instance
+        self.fetcher.mark_repo_as_recorded(repo_id)
+
+        # Create new fetcher instance with same cache dir
+        new_fetcher = GitHubContentFetcher(cache_dir=self.temp_dir)
+
+        # Should still be marked as recorded
+        self.assertTrue(new_fetcher._is_repo_recently_recorded(repo_id))
+
+    def test_skip_recently_recorded_repos(self):
+        """Test that recently recorded repos are skipped in trending fetch"""
+        # Get initial trending repos
+        initial_repos = self.fetcher.get_top5_unrecorded_trending_repos()
+
+        if initial_repos:
+            # Mark the first repo as recorded
+            first_repo_id = initial_repos[0]["full_name"]
+            self.fetcher.mark_repo_as_recorded(first_repo_id)
+
+            # Fetch again - should skip the recorded repo
+            new_repos = self.fetcher.get_top5_unrecorded_trending_repos()
+
+            # The previously recorded repo should not be in new results
+            new_repo_ids = [repo["full_name"] for repo in new_repos]
+            self.assertNotIn(first_repo_id, new_repo_ids)
+
+    def test_recorded_repos_file_creation(self):
+        """Test that recorded repos file is created properly"""
+        repo_id = "test/file-creation"
+
+        # File should not exist initially
+        self.assertFalse(self.fetcher.recorded_repos_file.exists())
+
+        # Mark a repo as recorded
+        self.fetcher.mark_repo_as_recorded(repo_id)
+
+        # File should now exist
+        self.assertTrue(self.fetcher.recorded_repos_file.exists())
+
+        # Verify file content
+        with open(self.fetcher.recorded_repos_file, 'r') as f:
+            data = json.load(f)
+
+        self.assertIn(repo_id, data)
+        # Verify timestamp format
+        import datetime
+        timestamp = datetime.datetime.fromisoformat(data[repo_id])
+        self.assertIsInstance(timestamp, datetime.datetime)
 
 
 if __name__ == "__main__":
