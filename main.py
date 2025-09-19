@@ -13,11 +13,13 @@ fireredtts2 = FireRedTTS2(
 )
 
 text_list = [
-    "[S1]那可能说对对，没有去过美国来说去去看到美国线下。巴斯曼也好，沃尔玛也好，他们线下不管说，因为深圳出去的还是电子周边的会表达，会发现哇对这个价格真的是很高呀。都是卖三十五美金、四十美金，甚至一个手机壳，就是二十五美金开。",
-    "[S2]对，没错，我每次都觉得不不可思议。我什么人会买三五十美金的手机壳？但是其实在在那个target啊，就塔吉特这种超级市场，大家都是这样的，定价也很多人买。",
-    "[S1]对对，那这样我们再去看说亚马逊上面卖卖卖手机壳也好啊，贴膜也好，还包括说车窗也好，各种线材也好，大概就是七块九九或者说啊八块九九，这个价格才是卖的最多的啊。因为亚马逊的游戏规则限定的。如果说你卖七块九九以下，那你基本上是不赚钱的。",
-    "[S2]那比如说呃除了这个可能去到海外这个调查，然后这个调研考察那肯定是最直接的了。那平时我知道你是刚才建立了一个这个叫做呃rean的这样的一个一个播客，它是一个英文的。然后平时你还听一些什么样的东西，或者是从哪里获取一些这个海外市场的一些信息呢？",
-    "[S1]嗯，因为做做亚马逊的话呢，我们会关注很多行业内的东西。就比如说行业有什么样亚马逊有什么样新的游戏规则呀。呃，物流的价格有没有波动呀，包括说有没有什么新的评论的政策呀，广告有什么新的打法呀？那这些我们会会关关注很多行业内部的微信公众号呀，还包括去去查一些知乎专栏的文章呀，以及说我们周边有很多同行。那我们经常会坐在一起聊天，看看信息有什么共享。那这个是关注内内的一个方式。",
+    "[S1]嗯，最近发现了一个很厉害的TTS系统叫FireRedTTS2。它最大的特点就是可以generate long conversational speech，支持multi-speaker dialogue generation。",
+    "[S2]真的吗？那它跟其他的TTS有什么不同呢？",
+    "[S1]这个system很特别，它可以支持3分钟的dialogue with 4 speakers，而且还有ultra-low latency。在L20 GPU上，first-packet latency只要140ms。最重要的是它支持multi lingual，包括English、Chinese、Japanese、Korean、French、German还有Russian。",
+    "[S2]听起来很powerful啊。那它还有什么其他features吗？",
+    "[S1]对，它还有zero-shot voice cloning功能，可以做cross-lingual和code-switching scenarios。而且还有random timbre generation，这个对creating ASR data很有用。最关键是stability很强，在monologue和dialogue tests里都有high similarity和low WER/CER。",
+    "[S2]那这个是open source的吗？",
+    "[S1]是的，它基于Apache 2.0 license。你可以在GitHub上找到FireRedTeam/FireRedTTS2，还有pre-trained checkpoints在Hugging Face上。不过要注意，voice cloning功能只能用于academic research purposes。",
 ]
 prompt_wav_list = [
     "examples/chat_prompt/zh/S1.flac",
@@ -29,7 +31,7 @@ prompt_text_list = [
     "[S2]比如具体一点的，他觉得最大的一个跟他预想的不一样的是在什么地方。",
 ]
 
-all_audio = fireredtts2.generate_dialogue(
+all_audio, srt_text = fireredtts2.generate_dialogue(
     text_list=text_list,
     prompt_wav_list=prompt_wav_list,
     prompt_text_list=prompt_text_list,
@@ -37,3 +39,7 @@ all_audio = fireredtts2.generate_dialogue(
     topk=30,
 )
 torchaudio.save("chat_clone.wav", all_audio, 24000)
+
+# Save SRT file
+with open("chat_clone.srt", "w", encoding="utf-8") as f:
+    f.write(srt_text)

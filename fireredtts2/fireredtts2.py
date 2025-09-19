@@ -400,7 +400,39 @@ class FireRedTTS2:
         # Concatenate all generations
         all_audio = torch.cat([seg.audio for seg in all_storage_segments], dim=1)
         all_audio = all_audio.cpu()
-        return all_audio
+
+        # Generate SRT text
+        srt_text = ""
+        current_time = 0.0
+        sample_rate = 24000  # Audio sample rate
+
+        for i, seg in enumerate(all_storage_segments):
+            # Calculate duration of this segment in seconds
+            duration = seg.audio.shape[1] / sample_rate
+
+            # Format timestamps for SRT
+            start_time = current_time
+            end_time = current_time + duration
+
+            start_timestamp = self._format_srt_timestamp(start_time)
+            end_timestamp = self._format_srt_timestamp(end_time)
+
+            # Add SRT entry
+            srt_text += f"{i + 1}\n"
+            srt_text += f"{start_timestamp} --> {end_timestamp}\n"
+            srt_text += f"{seg.speaker} {seg.text}\n\n"
+
+            current_time = end_time
+
+        return all_audio, srt_text
+
+    def _format_srt_timestamp(self, seconds):
+        """Convert seconds to SRT timestamp format (HH:MM:SS,mmm)"""
+        hours = int(seconds // 3600)
+        minutes = int((seconds % 3600) // 60)
+        secs = int(seconds % 60)
+        milliseconds = int((seconds % 1) * 1000)
+        return f"{hours:02d}:{minutes:02d}:{secs:02d},{milliseconds:03d}"
 
     @torch.inference_mode()
     def generate_monologue(
