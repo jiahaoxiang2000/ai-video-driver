@@ -200,11 +200,41 @@ class DialogueScene(Scene):
 
         logger.info("Completed Manim scene construction")
 
+    def _split_mixed_text(self, text):
+        """Split text handling both English words and Chinese characters with punctuation"""
+        import re
+
+        # Split on Chinese punctuation and whitespace while preserving them
+        # This regex captures: whitespace, Chinese punctuation, and keeps them as separators
+        chinese_punct = r'[，。！？；：、（）【】《》""''…—]'
+        pattern = rf'(\s+|{chinese_punct})'
+
+        # Split and filter out empty strings
+        parts = [part.strip() for part in re.split(pattern, text) if part.strip()]
+
+        # Further process to handle mixed content better
+        words = []
+        for part in parts:
+            # If it's punctuation, add it as is
+            if re.match(chinese_punct, part):
+                words.append(part)
+            # If it contains both English and Chinese, try to split more intelligently
+            elif any('\u4e00' <= char <= '\u9fff' for char in part):
+                # Contains Chinese characters
+                # Split on word boundaries but keep Chinese chars together
+                subparts = re.findall(r'[\u4e00-\u9fff]+|[a-zA-Z]+|\d+|[^\s\u4e00-\u9fff\w]', part)
+                words.extend(subparts)
+            else:
+                # Pure English/numbers, split by space
+                words.extend(part.split())
+
+        return [word for word in words if word]
+
     def _create_wrapped_text(self, text, max_width, font_size=None, color=WHITE):
         """Create text with word wrapping to fit within max_width"""
         if font_size is None:
             font_size = app_config["video"].TEXT_FONT_SIZE
-        words = text.split()
+        words = self._split_mixed_text(text)
         lines = []
         current_line = []
 
