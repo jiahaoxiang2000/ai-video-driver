@@ -9,6 +9,40 @@ resolution-markers = [
 ]
 
 [[package]]
+name = "ai-video-driver"
+version = "0.1.0"
+source = { virtual = "." }
+dependencies = [
+    { name = "einops" },
+    { name = "gradio", version = "4.44.1", source = { registry = "https://mirrors.tuna.tsinghua.edu.cn/pypi/web/simple" }, marker = "python_full_version < '3.10'" },
+    { name = "gradio", version = "5.46.0", source = { registry = "https://mirrors.tuna.tsinghua.edu.cn/pypi/web/simple" }, marker = "python_full_version >= '3.10'" },
+    { name = "librosa" },
+    { name = "manim" },
+    { name = "soundfile" },
+    { name = "torch" },
+    { name = "torchao" },
+    { name = "torchaudio" },
+    { name = "torchtune" },
+    { name = "torchvision" },
+    { name = "transformers" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "einops", specifier = ">=0.8.1" },
+    { name = "gradio", specifier = ">=4.44.1" },
+    { name = "librosa", specifier = ">=0.11.0" },
+    { name = "manim", specifier = ">=0.18.0" },
+    { name = "soundfile", specifier = ">=0.13.1" },
+    { name = "torch", specifier = "==2.7.1" },
+    { name = "torchao", specifier = ">=0.13.0" },
+    { name = "torchaudio", specifier = "==2.7.1" },
+    { name = "torchtune", specifier = ">=0.6.1" },
+    { name = "torchvision", specifier = "==0.22.1" },
+    { name = "transformers", specifier = ">=4.56.1" },
+]
+
+[[package]]
 name = "aiofiles"
 version = "23.2.1"
 source = { registry = "https://mirrors.tuna.tsinghua.edu.cn/pypi/web/simple" }
@@ -699,40 +733,6 @@ source = { registry = "https://mirrors.tuna.tsinghua.edu.cn/pypi/web/simple" }
 sdist = { url = "https://mirrors.tuna.tsinghua.edu.cn/pypi/web/packages/40/bb/0ab3e58d22305b6f5440629d20683af28959bf793d98d11950e305c1c326/filelock-3.19.1.tar.gz", hash = "sha256:66eda1888b0171c998b35be2bcc0f6d75c388a7ce20c3f3f37aa8e96c2dddf58", size = 17687, upload-time = "2025-08-14T16:56:03.016Z" }
 wheels = [
     { url = "https://mirrors.tuna.tsinghua.edu.cn/pypi/web/packages/42/14/42b2651a2f46b022ccd948bca9f2d5af0fd8929c4eec235b8d6d844fbe67/filelock-3.19.1-py3-none-any.whl", hash = "sha256:d38e30481def20772f5baf097c122c3babc4fcdb7e14e57049eb9d88c6dc017d", size = 15988, upload-time = "2025-08-14T16:56:01.633Z" },
-]
-
-[[package]]
-name = "fireredtts2"
-version = "0.1.0"
-source = { virtual = "." }
-dependencies = [
-    { name = "einops" },
-    { name = "gradio", version = "4.44.1", source = { registry = "https://mirrors.tuna.tsinghua.edu.cn/pypi/web/simple" }, marker = "python_full_version < '3.10'" },
-    { name = "gradio", version = "5.46.0", source = { registry = "https://mirrors.tuna.tsinghua.edu.cn/pypi/web/simple" }, marker = "python_full_version >= '3.10'" },
-    { name = "librosa" },
-    { name = "manim" },
-    { name = "soundfile" },
-    { name = "torch" },
-    { name = "torchao" },
-    { name = "torchaudio" },
-    { name = "torchtune" },
-    { name = "torchvision" },
-    { name = "transformers" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "einops", specifier = ">=0.8.1" },
-    { name = "gradio", specifier = ">=4.44.1" },
-    { name = "librosa", specifier = ">=0.11.0" },
-    { name = "manim", specifier = ">=0.18.0" },
-    { name = "soundfile", specifier = ">=0.13.1" },
-    { name = "torch", specifier = "==2.7.1" },
-    { name = "torchao", specifier = ">=0.13.0" },
-    { name = "torchaudio", specifier = "==2.7.1" },
-    { name = "torchtune", specifier = ">=0.6.1" },
-    { name = "torchvision", specifier = "==0.22.1" },
-    { name = "transformers", specifier = ">=4.56.1" },
 ]
 
 [[package]]

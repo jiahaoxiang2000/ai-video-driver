@@ -5,3 +5,13 @@
 
 # Pretrained models
 pretrained_models/
+
+# Output and temp files
+output/
+temp/
+*.wav
+*.mp4
+*.srt
+
+# Logs
+logs/
