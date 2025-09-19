@@ -6,6 +6,7 @@ import subprocess
 import logging
 import re
 from typing import List, Optional, Dict
+import textwrap
 
 logger = logging.getLogger(__name__)
 
@@ -53,7 +54,15 @@ class PodcastConverter:
 
         try:
             # Create conversion prompt
-            prompt = self._create_conversion_prompt(repo_content, style, length)
+            # Optimize content for better prompt size management
+            optimized_content = self._optimize_prompt_size(repo_content)
+            prompt = self._create_conversion_prompt(optimized_content, style, length)
+
+            # Log prompt statistics
+            estimated_tokens = self._estimate_prompt_tokens(prompt)
+            logger.debug(
+                f"Generated prompt: {len(prompt)} chars, ~{estimated_tokens} tokens"
+            )
 
             # Use Claude Code CLI with -p flag for non-interactive output
             result = subprocess.run(
@@ -105,7 +114,7 @@ class PodcastConverter:
 
         repo_name = repo_content.get("name", "Unknown Repository")
         repo_description = repo_content.get("description", "")
-        readme_content = repo_content.get("readme", "")[:3000]  # Limit for prompt size
+        readme_content = repo_content.get("readme", "")[:5000]  # Limit for prompt size
 
         prompt = f"""Convert this GitHub repository information into a natural podcast-style conversation between two speakers S1 and S2.
 

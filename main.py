@@ -9,7 +9,7 @@ import sys
 import time
 import argparse
 import os
-from typing import Optional
+from typing import Optional, List, Dict, Any
 from pathlib import Path
 
 from fireredtts2.fireredtts2 import FireRedTTS2
@@ -40,7 +40,9 @@ def get_default_dialogue():
     ]
 
 
-def generate_content_from_repo(repo_url: str, style: str, length: str, github_token: Optional[str] = None) -> list:
+def generate_content_from_repo(
+    repo_url: str, style: str, length: str, github_token: Optional[str] = None
+) -> list:
     """Generate dialogue content from a GitHub repository"""
     logger = setup_pipeline_logging()
 
@@ -58,50 +60,353 @@ def generate_content_from_repo(repo_url: str, style: str, length: str, github_to
 
         # Convert to podcast format
         converter = PodcastConverter()
-        dialogue = converter.convert_to_podcast(repo_content, style=style, length=length)
+        dialogue = converter.convert_to_podcast(
+            repo_content, style=style, length=length
+        )
 
         if dialogue and converter.validate_dialogue_format(dialogue):
             logger.info(f"Successfully generated {len(dialogue)} dialogue segments")
             return dialogue
         else:
             logger.warning("Generated dialogue failed validation, using fallback")
-            return converter.get_fallback_dialogue(repo_content)
+            return create_fallback_dialogue(
+                {
+                    "name": repo_content.get("name", ""),
+                    "description": repo_content.get("description", ""),
+                    "language": repo_content.get("language", ""),
+                    "stargazers_count": repo_content.get("stars", 0),
+                }
+            )
 
     except Exception as e:
         logger.error(f"Failed to generate content from repository: {e}")
         return get_default_dialogue()
 
 
-def generate_trending_content(language: str, style: str, length: str, github_token: Optional[str] = None) -> list:
-    """Generate dialogue content from trending repositories"""
+def get_top5_trending_repos(github_token: Optional[str] = None) -> List[Dict[str, Any]]:
+    """Get top 5 unrecorded trending repositories"""
     logger = setup_pipeline_logging()
 
     try:
         # Initialize content fetcher
         fetcher = GitHubContentFetcher(github_token=github_token)
 
-        # Get trending repositories
-        logger.info(f"Fetching trending {language} repositories")
-        trending_repos = fetcher.get_trending_repos(language=language, limit=1)
+        # Get top 5 trending repositories
+        logger.info("Fetching top 5 unrecorded trending repositories")
+        trending_repos = fetcher.get_top5_unrecorded_trending_repos()
 
         if not trending_repos:
             logger.error("No trending repositories found")
-            return get_default_dialogue()
+            return []
 
-        # Use the first trending repo
-        repo = trending_repos[0]
-        repo_url = repo.get("html_url")
+        logger.info(f"Found {len(trending_repos)} trending repositories")
+        for i, repo in enumerate(trending_repos, 1):
+            logger.info(
+                f"{i}. {repo.get('full_name', 'Unknown')} - {repo.get('stargazers_count', 0)} stars"
+            )
 
-        if not repo_url:
-            logger.error("No valid repository URL found")
-            return get_default_dialogue()
-
-        logger.info(f"Selected trending repo: {repo.get('full_name', 'Unknown')}")
-        return generate_content_from_repo(repo_url, style, length, github_token)
+        return trending_repos
 
     except Exception as e:
-        logger.error(f"Failed to generate content from trending repos: {e}")
+        logger.error(f"Failed to get trending repositories: {e}")
+        return []
+
+
+def generate_multi_repo_content(
+    style: str,
+    length: str,
+    device: str,
+    output_name: str,
+    github_token: Optional[str] = None,
+) -> bool:
+    """Generate content from top 5 trending repos and create combined video"""
+    logger = setup_pipeline_logging()
+
+    try:
+        # Get top 5 trending repositories
+        trending_repos = get_top5_trending_repos(github_token)
+
+        if not trending_repos:
+            logger.error("No trending repositories found")
+            return False
+
+        logger.info(f"Processing {len(trending_repos)} trending repositories")
+
+        # Create main output directory
+        main_output_dir = Path(f"outputs/{output_name}_multi_repo")
+        main_output_dir.mkdir(parents=True, exist_ok=True)
+
+        generated_videos = []
+
+        # Process each repository
+        for i, repo in enumerate(trending_repos, 1):
+            repo_name = repo.get("full_name", f"repo_{i}")
+            logger.info(f"Processing repository {i}/5: {repo_name}")
+
+            # Convert repo to podcast
+            podcast_dialogue = convert_repo_to_podcast(
+                repo, style, length, github_token
+            )
+
+            if not podcast_dialogue:
+                logger.warning(f"Failed to generate podcast for {repo_name}, skipping")
+                continue
+
+            # Generate video for this podcast
+            video_file = generate_video_for_podcast(
+                podcast_dialogue, repo_name, device, main_output_dir
+            )
+
+            if video_file:
+                generated_videos.append(video_file)
+                logger.info(f"Successfully generated video {i}/5 for {repo_name}")
+            else:
+                logger.warning(f"Failed to generate video for {repo_name}")
+
+        # Combine all videos
+        if generated_videos:
+            final_combined_video = main_output_dir / "combined_final.mp4"
+            success = combine_videos(generated_videos, final_combined_video)
+
+            if success:
+                logger.info("🎉 MULTI-REPO PIPELINE COMPLETED SUCCESSFULLY!")
+                logger.info(f"📁 Output directory: {main_output_dir}")
+                logger.info(f"🎬 Combined video: {final_combined_video}")
+                logger.info(f"📊 Generated {len(generated_videos)} individual videos")
+                print(f"\n🎬 Final combined video: {final_combined_video}")
+                print(f"📁 All files: {main_output_dir}")
+                return True
+            else:
+                logger.error("Failed to combine videos")
+                print(f"\n⚠️  Video combination failed")
+                print(f"📁 Individual videos: {main_output_dir}")
+                return False
+        else:
+            logger.error("No videos were generated")
+            return False
+
+    except Exception as e:
+        logger.error(f"Failed to generate multi-repo content: {e}")
+        return False
+
+
+def convert_repo_to_podcast(
+    repo_info: Dict[str, Any],
+    style: str,
+    length: str,
+    github_token: Optional[str] = None,
+) -> List[str]:
+    """Convert a single repository to podcast dialogue"""
+    logger = setup_pipeline_logging()
+
+    try:
+        # Get repository URL
+        repo_url = repo_info.get("html_url")
+        if not repo_url:
+            logger.error("No repository URL found")
+            return get_default_dialogue()
+
+        # Fetch detailed repository content
+        fetcher = GitHubContentFetcher(github_token=github_token)
+        repo_content = fetcher.fetch_repository_content(repo_url)
+
+        if not repo_content:
+            logger.error(
+                f"Failed to fetch content for {repo_info.get('full_name', 'Unknown')}"
+            )
+            return get_default_dialogue()
+
+        # Convert to podcast format
+        converter = PodcastConverter()
+        dialogue = converter.convert_to_podcast(
+            repo_content, style=style, length=length
+        )
+
+        if dialogue and converter.validate_dialogue_format(dialogue):
+            logger.info(
+                f"Successfully converted {repo_info.get('full_name', 'Unknown')} to {len(dialogue)} dialogue segments"
+            )
+
+            # Mark repo as recorded
+            fetcher.mark_repo_as_recorded(repo_info.get("full_name", ""))
+
+            return dialogue
+        else:
+            logger.warning(
+                f"Generated dialogue failed validation for {repo_info.get('full_name', 'Unknown')}, using fallback"
+            )
+            # Create a simple fallback dialogue based on repo info
+            return create_fallback_dialogue(repo_info)
+
+    except Exception as e:
+        logger.error(f"Failed to convert repository to podcast: {e}")
         return get_default_dialogue()
+
+
+def create_fallback_dialogue(repo_info: Dict[str, Any]) -> List[str]:
+    """Create fallback dialogue based on repository information"""
+    name = repo_info.get("name", "Unknown Repository")
+    description = repo_info.get("description", "")
+    language = repo_info.get("language", "")
+    stars = repo_info.get("stargazers_count", 0)
+
+    dialogue = [
+        f"[S1]今天我们来聊聊GitHub上一个有趣的项目叫{name}。",
+        f"[S2]听起来很有意思，这个project是做什么的呢？",
+    ]
+
+    if description:
+        dialogue.append(f"[S1]{description}")
+        dialogue.append(f"[S2]那这个项目有什么特别的功能吗？")
+
+    if language:
+        dialogue.append(f"[S1]这个project主要是用{language}开发的。")
+
+    if stars > 0:
+        dialogue.append(f"[S2]看起来很受欢迎啊，有{stars}个stars了。")
+        dialogue.append(f"[S1]是的，说明这个项目确实有价值，值得大家关注。")
+
+    return dialogue
+
+
+def generate_video_for_podcast(
+    podcast_dialogue: List[str], repo_name: str, device: str, output_base_dir: Path
+) -> Optional[Path]:
+    """Generate a single video from podcast dialogue"""
+    logger = setup_pipeline_logging()
+
+    try:
+        # Create unique output directory for this repo
+        repo_output_dir = output_base_dir / f"repo_{repo_name.replace('/', '_')}"
+        repo_output_dir.mkdir(parents=True, exist_ok=True)
+        temp_dir = repo_output_dir / "temp"
+        temp_dir.mkdir(exist_ok=True)
+
+        logger.info(
+            f"Generating video for {repo_name} with {len(podcast_dialogue)} dialogue segments"
+        )
+
+        # Initialize FireRedTTS2
+        fireredtts2 = FireRedTTS2(
+            pretrained_dir="./pretrained_models/FireRedTTS2",
+            gen_type="dialogue",
+            device=device,
+        )
+
+        # Prompt files
+        prompt_wav_list = [
+            "examples/chat_prompt/zh/S1.flac",
+            "examples/chat_prompt/zh/S2.flac",
+        ]
+
+        prompt_text_list = [
+            "[S1]啊，可能说更适合美国市场应该是什么样子。那这这个可能说当然如果说有有机会能亲身的去考察去了解一下，那当然是有更好的帮助。",
+            "[S2]比如具体一点的，他觉得最大的一个跟他预想的不一样的是在什么地方。",
+        ]
+
+        # Generate TTS audio and SRT
+        all_audio, srt_text = fireredtts2.generate_dialogue(
+            text_list=podcast_dialogue,
+            prompt_wav_list=prompt_wav_list,
+            prompt_text_list=prompt_text_list,
+            temperature=config["audio"].DEFAULT_TEMPERATURE,
+            topk=config["audio"].DEFAULT_TOPK,
+        )
+
+        # Save audio and SRT files
+        audio_file, _ = save_files(
+            repo_output_dir, all_audio, srt_text, config["audio"].SAMPLE_RATE
+        )
+
+        # Generate video from SRT
+        video_file = generate_video_from_srt(
+            srt_text, audio_file, repo_output_dir, temp_dir
+        )
+
+        if video_file and video_file.exists():
+            # Combine audio with video
+            final_video = repo_output_dir / f"{repo_name.replace('/', '_')}_final.mp4"
+            success = combine_audio_video(audio_file, video_file, final_video)
+
+            if success and final_video.exists():
+                logger.info(
+                    f"Successfully generated video for {repo_name}: {final_video}"
+                )
+                return final_video
+            else:
+                logger.warning(
+                    f"Audio/video combination failed for {repo_name}, returning silent video"
+                )
+                return video_file
+        else:
+            logger.error(f"Video generation failed for {repo_name}")
+            return None
+
+    except Exception as e:
+        logger.error(f"Failed to generate video for {repo_name}: {e}")
+        return None
+
+
+def combine_videos(video_files: List[Path], output_file: Path) -> bool:
+    """Combine multiple videos into one final video"""
+    logger = setup_pipeline_logging()
+
+    try:
+        import subprocess
+
+        # Filter out None values and ensure all files exist
+        valid_videos = [v for v in video_files if v and v.exists()]
+
+        if not valid_videos:
+            logger.error("No valid video files to combine")
+            return False
+
+        if len(valid_videos) == 1:
+            # If only one video, just copy it
+            import shutil
+
+            shutil.copy2(valid_videos[0], output_file)
+            logger.info(f"Single video copied to {output_file}")
+            return True
+
+        # Create a text file listing all videos for ffmpeg
+        concat_file = output_file.parent / "concat_list.txt"
+        with open(concat_file, "w") as f:
+            for video in valid_videos:
+                f.write(f"file '{video.absolute()}'\n")
+
+        # Use ffmpeg to concatenate videos
+        cmd = [
+            "ffmpeg",
+            "-y",  # -y to overwrite output file
+            "-f",
+            "concat",
+            "-safe",
+            "0",
+            "-i",
+            str(concat_file),
+            "-c",
+            "copy",  # Copy streams without re-encoding
+            str(output_file),
+        ]
+
+        result = subprocess.run(cmd, capture_output=True, text=True)
+
+        # Clean up concat file
+        concat_file.unlink(missing_ok=True)
+
+        if result.returncode == 0:
+            logger.info(
+                f"Successfully combined {len(valid_videos)} videos into {output_file}"
+            )
+            return True
+        else:
+            logger.error(f"FFmpeg failed to combine videos: {result.stderr}")
+            return False
+
+    except Exception as e:
+        logger.error(f"Failed to combine videos: {e}")
+        return False
 
 
 def parse_arguments():
@@ -111,30 +416,15 @@ def parse_arguments():
     )
 
     parser.add_argument(
-        "--repo-url",
-        type=str,
-        help="GitHub repository URL to generate content from"
-    )
-
-    parser.add_argument(
-        "--trending",
-        action="store_true",
-        help="Use trending repositories instead of specific URL"
-    )
-
-    parser.add_argument(
-        "--language",
-        type=str,
-        default="python",
-        help="Programming language for trending repos (default: python)"
+        "--repo-url", type=str, help="GitHub repository URL to generate content from"
     )
 
     parser.add_argument(
         "--style",
         type=str,
         choices=["educational", "casual", "technical", "marketing"],
-        default="educational",
-        help="Podcast style (default: educational)"
+        default="technical",
+        help="Podcast style (default: technical)",
     )
 
     parser.add_argument(
@@ -142,27 +432,39 @@ def parse_arguments():
         type=str,
         choices=["short", "medium", "long"],
         default="medium",
-        help="Dialogue length (default: medium)"
+        help="Dialogue length (default: medium)",
     )
 
     parser.add_argument(
         "--github-token",
         type=str,
-        help="GitHub API token (can also use GITHUB_TOKEN env var)"
+        help="GitHub API token (can also use GITHUB_TOKEN env var)",
     )
 
     parser.add_argument(
         "--device",
         type=str,
         default="cuda",
-        help="Device for TTS model (default: cuda)"
+        help="Device for TTS model (default: cuda)",
     )
 
     parser.add_argument(
         "--output-name",
         type=str,
         default="auto_generated",
-        help="Output directory name (default: auto_generated)"
+        help="Output directory name (default: auto_generated)",
+    )
+
+    parser.add_argument(
+        "--multi-repo",
+        action="store_true",
+        help="Generate videos from top 5 trending repos and combine them",
+    )
+
+    parser.add_argument(
+        "--video-only",
+        action="store_true",
+        help="Generate videos only without combining them",
     )
 
     return parser.parse_args()
@@ -184,16 +486,24 @@ def main():
     device = args.device
     logger.info(f"🖥️  Using device: {device}")
 
+    # Handle multi-repo workflow
+    if args.multi_repo:
+        logger.info("🔄 Starting multi-repository video generation workflow")
+        success = generate_multi_repo_content(
+            args.style, args.length, device, args.output_name, github_token
+        )
+        if success:
+            logger.info("✅ Multi-repo workflow completed successfully")
+        else:
+            logger.error("❌ Multi-repo workflow failed")
+            sys.exit(1)
+        return
+
     # Generate dialogue content based on arguments
     if args.repo_url:
         logger.info(f"🔗 Generating content from repository: {args.repo_url}")
         text_list = generate_content_from_repo(
             args.repo_url, args.style, args.length, github_token
-        )
-    elif args.trending:
-        logger.info(f"📈 Generating content from trending {args.language} repositories")
-        text_list = generate_trending_content(
-            args.language, args.style, args.length, github_token
         )
     else:
         logger.info("📝 Using default FireRedTTS2 content")
