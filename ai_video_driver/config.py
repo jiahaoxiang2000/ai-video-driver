@@ -80,10 +80,32 @@ class LogConfig:
     ENCODING = "utf-8"
 
 
+class ContentConfig:
+    """Configuration for content generation"""
+
+    # GitHub API settings
+    GITHUB_API_BASE = "https://api.github.com"
+    DEFAULT_CACHE_HOURS = 1
+    MAX_README_LENGTH = 5000
+
+    # Trending repositories
+    DEFAULT_LANGUAGE = "python"
+    TRENDING_LIMIT = 10
+
+    # Podcast conversion settings
+    DEFAULT_STYLE = "educational"
+    DEFAULT_LENGTH = "medium"
+
+    # Claude CLI settings
+    CLAUDE_TIMEOUT = 120  # seconds
+    MAX_DIALOGUE_SEGMENTS = 24
+
+
 # Global configuration instance
 config = {
     'video': VideoConfig(),
     'audio': AudioConfig(),
     'files': FileConfig(),
-    'logging': LogConfig()
+    'logging': LogConfig(),
+    'content': ContentConfig()
 }

@@ -7,6 +7,10 @@ video animations with Manim, and combines everything into a final video output.
 
 import sys
 import time
+import argparse
+import os
+from typing import Optional
+from pathlib import Path
 
 from fireredtts2.fireredtts2 import FireRedTTS2
 from ai_video_driver import (
@@ -19,20 +23,13 @@ from ai_video_driver import (
     log_file_info,
     config,
 )
+from ai_video_driver.content_fetcher import GitHubContentFetcher
+from ai_video_driver.podcast_converter import PodcastConverter
 
 
-def main():
-    """Main pipeline execution with enhanced logging and error handling"""
-
-    # Setup logging
-    logger = setup_pipeline_logging()
-
-    # Configuration
-    device = "cuda"
-    logger.info(f"🖥️  Using device: {device}")
-
-    # Text content for dialogue
-    text_list = [
+def get_default_dialogue():
+    """Default dialogue content about FireRedTTS2"""
+    return [
         "[S1]嗯，最近发现了一个很厉害的TTS系统叫FireRedTTS2。它最大的特点就是可以generate long conversational speech，支持multi-speaker dialogue generation。",
         "[S2]真的吗？那它跟其他的TTS有什么不同呢？",
         "[S1]这个system很特别，它可以支持3分钟的dialogue with 4 speakers，而且还有ultra-low latency。在L20 GPU上，first-packet latency只要140ms。最重要的是它支持multi lingual，包括English、Chinese、Japanese、Korean、French、German还有Russian。",
@@ -41,6 +38,166 @@ def main():
         "[S2]那这个是open source的吗？",
         "[S1]是的，它基于Apache 2.0 license。你可以在GitHub上找到FireRedTeam/FireRedTTS2，还有pre-trained checkpoints在Hugging Face上。不过要注意，voice cloning功能只能用于academic research purposes。",
     ]
+
+
+def generate_content_from_repo(repo_url: str, style: str, length: str, github_token: Optional[str] = None) -> list:
+    """Generate dialogue content from a GitHub repository"""
+    logger = setup_pipeline_logging()
+
+    try:
+        # Initialize content fetcher
+        fetcher = GitHubContentFetcher(github_token=github_token)
+
+        # Fetch repository content
+        logger.info(f"Fetching content from repository: {repo_url}")
+        repo_content = fetcher.fetch_repository_content(repo_url)
+
+        if not repo_content:
+            logger.error("Failed to fetch repository content")
+            return get_default_dialogue()
+
+        # Convert to podcast format
+        converter = PodcastConverter()
+        dialogue = converter.convert_to_podcast(repo_content, style=style, length=length)
+
+        if dialogue and converter.validate_dialogue_format(dialogue):
+            logger.info(f"Successfully generated {len(dialogue)} dialogue segments")
+            return dialogue
+        else:
+            logger.warning("Generated dialogue failed validation, using fallback")
+            return converter.get_fallback_dialogue(repo_content)
+
+    except Exception as e:
+        logger.error(f"Failed to generate content from repository: {e}")
+        return get_default_dialogue()
+
+
+def generate_trending_content(language: str, style: str, length: str, github_token: Optional[str] = None) -> list:
+    """Generate dialogue content from trending repositories"""
+    logger = setup_pipeline_logging()
+
+    try:
+        # Initialize content fetcher
+        fetcher = GitHubContentFetcher(github_token=github_token)
+
+        # Get trending repositories
+        logger.info(f"Fetching trending {language} repositories")
+        trending_repos = fetcher.get_trending_repos(language=language, limit=1)
+
+        if not trending_repos:
+            logger.error("No trending repositories found")
+            return get_default_dialogue()
+
+        # Use the first trending repo
+        repo = trending_repos[0]
+        repo_url = repo.get("html_url")
+
+        if not repo_url:
+            logger.error("No valid repository URL found")
+            return get_default_dialogue()
+
+        logger.info(f"Selected trending repo: {repo.get('full_name', 'Unknown')}")
+        return generate_content_from_repo(repo_url, style, length, github_token)
+
+    except Exception as e:
+        logger.error(f"Failed to generate content from trending repos: {e}")
+        return get_default_dialogue()
+
+
+def parse_arguments():
+    """Parse command line arguments"""
+    parser = argparse.ArgumentParser(
+        description="AI Video Driver - Generate podcast-style videos from GitHub repositories"
+    )
+
+    parser.add_argument(
+        "--repo-url",
+        type=str,
+        help="GitHub repository URL to generate content from"
+    )
+
+    parser.add_argument(
+        "--trending",
+        action="store_true",
+        help="Use trending repositories instead of specific URL"
+    )
+
+    parser.add_argument(
+        "--language",
+        type=str,
+        default="python",
+        help="Programming language for trending repos (default: python)"
+    )
+
+    parser.add_argument(
+        "--style",
+        type=str,
+        choices=["educational", "casual", "technical", "marketing"],
+        default="educational",
+        help="Podcast style (default: educational)"
+    )
+
+    parser.add_argument(
+        "--length",
+        type=str,
+        choices=["short", "medium", "long"],
+        default="medium",
+        help="Dialogue length (default: medium)"
+    )
+
+    parser.add_argument(
+        "--github-token",
+        type=str,
+        help="GitHub API token (can also use GITHUB_TOKEN env var)"
+    )
+
+    parser.add_argument(
+        "--device",
+        type=str,
+        default="cuda",
+        help="Device for TTS model (default: cuda)"
+    )
+
+    parser.add_argument(
+        "--output-name",
+        type=str,
+        default="auto_generated",
+        help="Output directory name (default: auto_generated)"
+    )
+
+    return parser.parse_args()
+
+
+def main():
+    """Main pipeline execution with enhanced logging and error handling"""
+
+    # Parse command line arguments
+    args = parse_arguments()
+
+    # Setup logging
+    logger = setup_pipeline_logging()
+
+    # Get GitHub token from args or environment
+    github_token = args.github_token or os.getenv("GITHUB_TOKEN")
+
+    # Configuration
+    device = args.device
+    logger.info(f"🖥️  Using device: {device}")
+
+    # Generate dialogue content based on arguments
+    if args.repo_url:
+        logger.info(f"🔗 Generating content from repository: {args.repo_url}")
+        text_list = generate_content_from_repo(
+            args.repo_url, args.style, args.length, github_token
+        )
+    elif args.trending:
+        logger.info(f"📈 Generating content from trending {args.language} repositories")
+        text_list = generate_trending_content(
+            args.language, args.style, args.length, github_token
+        )
+    else:
+        logger.info("📝 Using default FireRedTTS2 content")
+        text_list = get_default_dialogue()
 
     prompt_wav_list = [
         "examples/chat_prompt/zh/S1.flac",
@@ -68,7 +225,7 @@ def main():
 
         # Step 2: Create output structure
         with PipelineTimer("Create output directory structure", logger):
-            output_dir, temp_dir = create_output_structure("chat_clone")
+            output_dir, temp_dir = create_output_structure(args.output_name)
 
         # Step 3: Generate TTS audio and SRT
         with PipelineTimer("Generate dialogue audio and subtitles", logger):

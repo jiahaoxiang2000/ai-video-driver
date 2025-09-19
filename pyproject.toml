@@ -16,4 +16,6 @@ dependencies = [
     "soundfile>=0.13.1",
     "librosa>=0.11.0",
     "manim>=0.18.0",
+    "requests>=2.31.0",
+    "pytest>=7.0.0",
 ]
