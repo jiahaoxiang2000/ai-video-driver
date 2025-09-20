@@ -4,9 +4,9 @@
         <strong>Transform text into engaging videos with AI-powered speech and animation</strong><br>
         <em>Automated video generation using FireRedTTS-2 and Manim</em>
     </p>
-
     <a href="https://github.com/jiahaoxiang2000/ai-video-driver"><img src="https://img.shields.io/badge/GitHub-Repository-blue" alt="GitHub repo"></a>
     <a href="https://github.com/jiahaoxiang2000/ai-video-driver"><img src="https://img.shields.io/badge/License-Apache%202.0-blue.svg" alt="Apache-2.0"></a>
+    <a href="#"><img src="https://img.shields.io/badge/Python-3.9%2B-blue" alt="Python 3.9+"></a>
 </div>
 
 ## What is AI Video Driver?
