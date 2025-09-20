@@ -16,3 +16,6 @@ temp/
 
 # Logs
 logs/
+
+# Example files
+examples/chat_prompt/
