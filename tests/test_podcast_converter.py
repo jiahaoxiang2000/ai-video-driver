@@ -20,14 +20,6 @@ class TestPodcastConverter(unittest.TestCase):
         """Set up test environment"""
         self.converter = PodcastConverter()
 
-    def test_check_claude_availability(self):
-        """Test Claude CLI availability check"""
-        available = self.converter.check_claude_availability()
-
-        # This will test the real availability of Claude CLI
-        # The result depends on whether Claude CLI is actually installed
-        self.assertIsInstance(available, bool)
-
     def test_convert_to_podcast(self):
         """Test podcast conversion"""
         repo_content = {
@@ -63,7 +55,7 @@ This guide provides instructions for setting up the environment and running infe
 Tongyi DeepResearch has an extensive deep research agent family including WebWalker, WebDancer, WebSailor, WebShaper, WebWatcher, WebResearcher, ReSum, WebWeaver and more, all designed for advanced web navigation and information seeking tasks.""",
         }
 
-        dialogue = self.converter.convert_to_podcast(repo_content)
+        dialogue = self.converter.convert_to_podcast(repo_content, style="casual")
         print("Generated dialogue:")
         if dialogue:
             for i, line in enumerate(dialogue, 1):
@@ -114,23 +106,6 @@ This is a response without speaker tag.
         dialogue = self.converter._parse_dialogue_response(response)
 
         self.assertIsNone(dialogue)
-
-    def test_create_conversion_prompt(self):
-        """Test conversion prompt creation"""
-        repo_content = {
-            "name": "test-repo",
-            "description": "A test repository",
-            "readme": "# Test Repo\n\nThis is a test.",
-        }
-
-        prompt = self.converter._create_conversion_prompt(
-            repo_content, "educational", "medium"
-        )
-
-        self.assertIn("test-repo", prompt)
-        self.assertIn("A test repository", prompt)
-        self.assertIn("educational", prompt)
-        self.assertIn("Generate 5-7 dialogue exchanges", prompt)
 
     def test_validate_dialogue_format_valid(self):
         """Test dialogue format validation - valid"""

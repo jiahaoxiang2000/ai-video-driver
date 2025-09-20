@@ -1,40 +1,40 @@
 """
-Claude Code CLI integration for converting repository content to podcast format.
+OpenAI/DeepSeek API integration for converting repository content to podcast format.
 """
 
-import subprocess
 import logging
 import re
+import os
 from typing import List, Optional, Dict
-import textwrap
+from openai import OpenAI
 
 logger = logging.getLogger(__name__)
 
 
 class PodcastConverter:
-    """Converts repository content to podcast dialogue using Claude Code CLI"""
+    """Converts repository content to podcast dialogue using OpenAI/DeepSeek API"""
 
-    def __init__(self):
-        self.claude_cmd = "claude"
-        logger.info("Initialized Podcast Converter with Claude Code CLI")
+    def __init__(self, api_key: str = None, base_url: str = "https://api.deepseek.com"):
+        self.client = OpenAI(
+            api_key=api_key or os.getenv("DEEPSEEK_API_KEY"), base_url=base_url
+        )
+        # self.model = "deepseek-chat"
+        self.model = "deepseek-reasoner"
+        logger.info("Initialized Podcast Converter with OpenAI/DeepSeek API")
 
-    def check_claude_availability(self) -> bool:
-        """Check if Claude Code CLI is available"""
+    def check_api_availability(self) -> bool:
+        """Check if OpenAI/DeepSeek API is available"""
         try:
-            result = subprocess.run(
-                [self.claude_cmd, "--version"],
-                capture_output=True,
-                text=True,
-                timeout=10,
+            # Simple test to check if API is working
+            response = self.client.chat.completions.create(
+                model=self.model,
+                messages=[{"role": "user", "content": "test"}],
+                max_tokens=1,
             )
-            if result.returncode == 0:
-                logger.info(f"Claude Code CLI available: {result.stdout.strip()}")
-                return True
-            else:
-                logger.error("Claude Code CLI not found or not working")
-                return False
+            logger.info("OpenAI/DeepSeek API is available")
+            return True
         except Exception as e:
-            logger.error(f"Failed to check Claude availability: {e}")
+            logger.error(f"Failed to check API availability: {e}")
             return False
 
     def convert_to_podcast(
@@ -48,48 +48,49 @@ class PodcastConverter:
             f"Converting repository content to podcast format (style: {style}, length: {length})"
         )
 
-        if not self.check_claude_availability():
-            logger.error("Claude Code CLI not available, cannot convert content")
+        if not self.check_api_availability():
+            logger.error("OpenAI/DeepSeek API not available, cannot convert content")
             return None
 
         try:
-            # Create conversion prompt
-            prompt = self._create_conversion_prompt(repo_content, style, length)
-
-            # Use Claude Code CLI with -p flag for non-interactive output
-            result = subprocess.run(
-                [self.claude_cmd, "-p", prompt],
-                capture_output=True,
-                text=True,
-                timeout=120,  # 2 minutes timeout
+            # Create conversion prompts
+            system_prompt, user_prompt = self._create_conversion_prompt(
+                repo_content, style, length
             )
 
-            if result.returncode == 0:
-                # Parse the Claude response to extract dialogue
-                dialogue = self._parse_dialogue_response(result.stdout)
+            # Use OpenAI API to generate podcast dialogue
+            messages = [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
+            ]
+            response = self.client.chat.completions.create(
+                model=self.model, messages=messages, temperature=1.5
+            )
+
+            if response.choices and response.choices[0].message.content:
+                # Parse the API response to extract dialogue
+                dialogue = self._parse_dialogue_response(
+                    response.choices[0].message.content
+                )
                 if dialogue:
                     logger.info(
                         f"Successfully converted content to {len(dialogue)} dialogue segments"
                     )
                     return dialogue
                 else:
-                    logger.error("Failed to parse dialogue from Claude response")
+                    logger.error("Failed to parse dialogue from API response")
                     return None
             else:
-                logger.error(f"Claude CLI failed with error: {result.stderr}")
+                logger.error("API returned empty response")
                 return None
-
-        except subprocess.TimeoutExpired:
-            logger.error("Claude CLI conversion timed out")
-            return None
         except Exception as e:
             logger.error(f"Failed to convert content to podcast: {e}")
             return None
 
     def _create_conversion_prompt(
         self, repo_content: Dict[str, str], style: str, length: str
-    ) -> str:
-        """Create the conversion prompt for Claude"""
+    ) -> tuple[str, str]:
+        """Create the system and user prompts for conversion"""
 
         length_instructions = {
             "short": "Generate 3-4 dialogue exchanges (6-8 total segments)",
@@ -104,17 +105,7 @@ class PodcastConverter:
             "marketing": "Emphasize benefits, use cases, and why people should use this project",
         }
 
-        repo_name = repo_content.get("name", "Unknown Repository")
-        repo_description = repo_content.get("description", "")
-        readme_content = repo_content.get("readme", "")[:5000]  # Limit for prompt size
-
-        prompt = f"""Convert this GitHub repository information into a natural podcast-style conversation between two speakers S1 and S2.
-
-Repository: {repo_name}
-Description: {repo_description}
-
-README Content:
-{readme_content}
+        system_prompt = f"""You are a podcast content generator that converts GitHub repository information into natural podcast-style conversations between two speakers S1 and S2.
 
 Instructions:
 - {length_instructions.get(length, length_instructions["medium"])}
@@ -133,11 +124,23 @@ Output only the dialogue lines in the specified format, one per line. Do not inc
 Example style:
 [S1]....
 [S2]....
-[S1]...
+[S1]..."""
 
-Now generate the full conversation:"""
+        repo_name = repo_content.get("name", "Unknown Repository")
+        repo_description = repo_content.get("description", "")
+        readme_content = repo_content.get("readme", "")[:5000]  # Limit for prompt size
 
-        return prompt
+        user_prompt = f"""Convert this GitHub repository information into a natural podcast-style conversation:
+
+Repository: {repo_name}
+Description: {repo_description}
+
+README Content:
+{readme_content}
+
+Generate the full conversation following the instructions provided."""
+
+        return system_prompt, user_prompt
 
     def _parse_dialogue_response(self, response: str) -> Optional[List[str]]:
         """Parse Claude's response to extract dialogue segments"""
