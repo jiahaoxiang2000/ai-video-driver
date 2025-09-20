@@ -1,7 +1,7 @@
 [project]
 name = "ai-video-driver"
 version = "0.1.0"
-description = "Add your description here"
+description = "AI-powered automatic video generation tool that transforms text into engaging videos with synchronized speech and animation using FireRedTTS-2 and Manim"
 readme = "README.md"
 requires-python = ">=3.9, <3.13"
 dependencies = [

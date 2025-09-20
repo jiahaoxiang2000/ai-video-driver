@@ -1,51 +1,49 @@
 <div align="center">
-    <h1>
-    AI Video Driver
-    </h1>
+    <h1>AI Video Driver</h1>
     <p>
-    AI-powered automatic video driver creation tool <br>
-    <b><em>Leveraging FireRedTTS-2 for intelligent video content generation</em></b>
+        <strong>Transform text into engaging videos with AI-powered speech and animation</strong><br>
+        <em>Automated video generation using FireRedTTS-2 and Manim</em>
     </p>
-    <p>
-    </p>
+
     <a href="https://github.com/jiahaoxiang2000/ai-video-driver"><img src="https://img.shields.io/badge/GitHub-Repository-blue" alt="GitHub repo"></a>
     <a href="https://github.com/jiahaoxiang2000/ai-video-driver"><img src="https://img.shields.io/badge/License-Apache%202.0-blue.svg" alt="Apache-2.0"></a>
+    <a href="#"><img src="https://img.shields.io/badge/Python-3.9%2B-blue" alt="Python 3.9+"></a>
 </div>
 
-## Overview
+## What is AI Video Driver?
 
-AI Video Driver is an intelligent tool that leverages the power of FireRedTTS-2 for **automatic video content generation**. This system combines advanced text-to-speech capabilities with AI-driven video creation workflows to produce engaging multimedia content automatically.
+AI Video Driver automatically transforms text content into professional videos with synchronized speech and animations. Whether you're creating educational content, podcasts, or presentations, this tool handles the entire pipeline from text input to final video output.
 
-## Architecture
+### Key Capabilities
 
-### Core Components
+- **🎙️ Natural Speech Generation**: High-quality, multi-speaker text-to-speech using FireRedTTS-2
+- **🎬 Automated Video Creation**: Dynamic scene generation and animation with Manim
+- **📝 Content Processing**: Intelligent text parsing and dialogue extraction
+- **🎯 Perfect Synchronization**: Precise audio-visual timing with automated subtitle generation
+- **🌐 Multi-language Support**: Handles mixed English-Chinese content seamlessly
 
-The system is built with a modular architecture consisting of three main layers:
+### Perfect For
 
-#### 1. **FireRedTTS2 Engine** (`fireredtts2/`)
-- **TTS Core** (`fireredtts2.py`) - Main text-to-speech synthesis engine
-- **Audio Codec** (`codec/`) - Audio encoding/decoding, neural vocoding (RVQ), Whisper integration
-- **Language Models** (`llm/`) - Neural language processing and dialogue understanding
-- **Utilities** (`utils/`) - Text processing and splitting utilities
+- **Educators** creating lecture videos and tutorials
+- **Content Creators** producing podcast visualizations
+- **Developers** generating product demos and documentation videos
+- **Businesses** creating training materials and presentations
 
-#### 2. **AI Video Driver** (`ai_video_driver/`)
-- **Video Generator** (`video_generator.py`) - Manim-based video scene generation and audio-video synchronization
-- **File Management** (`file_utils.py`) - Output structure management and file operations
-- **Configuration** (`config.py`) - Pipeline settings and parameters
-- **Logging** (`logger.py`) - Enhanced logging and performance monitoring
 
-#### 3. **Main Pipeline** (`main.py`)
-- Orchestrates the complete video generation workflow
-- Handles multi-speaker dialogue processing
-- Manages timing synchronization between audio and video
-- Provides comprehensive error handling and logging
-
-### Data Flow
+## How It Works
 
 ```
-Text Input → FireRedTTS2 → Audio Generation → SRT Generation → Video Creation → Final Output
-    ↓             ↓              ↓               ↓              ↓
-Dialogue     Multi-speaker   Synchronized    Manim Scene   Combined A/V
-Processing   Voice Cloning   Subtitles       Animation     with Subtitles
+📝 Text Input → 🎙️ Speech Synthesis → 🎬 Video Generation → 🎯 Final Output
+    ↓              ↓                    ↓                  ↓
+ Dialogue       Multi-speaker         Manim Scene       Combined A/V
+Processing     Voice Cloning         Animation         with Subtitles
 ```
+
+The AI Video Driver processes your content through an intelligent pipeline:
+
+1. **Text Processing**: Analyzes and structures your input text, identifying speakers and dialogue
+2. **Speech Generation**: Uses FireRedTTS-2 to create natural, multi-speaker audio
+3. **Video Creation**: Generates synchronized visual scenes using Manim animation library
+4. **Final Assembly**: Combines audio, video, and subtitles into a polished final product
+
 
