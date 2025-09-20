@@ -26,6 +26,17 @@ from ai_video_driver import (
 from ai_video_driver.content_fetcher import GitHubContentFetcher
 from ai_video_driver.podcast_converter import PodcastConverter
 
+# Global voice prompt configuration
+PROMPT_WAV_LIST = [
+    "audio/S1.wav",
+    "audio/S2.wav",
+]
+
+PROMPT_TEXT_LIST = [
+    "[S1]然后，额外再讲一下，就是他有一个，这个，他这个插件有一个可以自定义它的一个json",
+    "[S2]从剧场转影视之后有什么差别，然后你的适应呀等等，你觉得你做了什么样的调试",
+]
+
 
 def get_default_dialogue():
     """Default dialogue content about FireRedTTS2"""
@@ -293,16 +304,9 @@ def generate_video_for_podcast(
             device=device,
         )
 
-        # Prompt files
-        prompt_wav_list = [
-            "examples/chat_prompt/zh/S1.flac",
-            "examples/chat_prompt/zh/S2.flac",
-        ]
+        prompt_wav_list = PROMPT_WAV_LIST
 
-        prompt_text_list = [
-            "[S1]啊，可能说更适合美国市场应该是什么样子。那这这个可能说当然如果说有有机会能亲身的去考察去了解一下，那当然是有更好的帮助。",
-            "[S2]比如具体一点的，他觉得最大的一个跟他预想的不一样的是在什么地方。",
-        ]
+        prompt_text_list = PROMPT_TEXT_LIST
 
         # Generate TTS audio and SRT
         all_audio, srt_text = fireredtts2.generate_dialogue(
@@ -509,15 +513,8 @@ def main():
         logger.info("📝 Using default FireRedTTS2 content")
         text_list = get_default_dialogue()
 
-    prompt_wav_list = [
-        "examples/chat_prompt/zh/S1.flac",
-        "examples/chat_prompt/zh/S2.flac",
-    ]
-
-    prompt_text_list = [
-        "[S1]啊，可能说更适合美国市场应该是什么样子。那这这个可能说当然如果说有有机会能亲身的去考察去了解一下，那当然是有更好的帮助。",
-        "[S2]比如具体一点的，他觉得最大的一个跟他预想的不一样的是在什么地方。",
-    ]
+    prompt_wav_list = PROMPT_WAV_LIST
+    prompt_text_list = PROMPT_TEXT_LIST
 
     logger.info(f"📝 Dialogue contains {len(text_list)} text segments")
     logger.info(f"🎤 Using {len(prompt_wav_list)} voice prompts")

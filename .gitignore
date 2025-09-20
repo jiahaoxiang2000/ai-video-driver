@@ -10,12 +10,8 @@ pretrained_models/
 output/
 outputs/
 temp/
-*.wav
 *.mp4
 *.srt
 
 # Logs
 logs/
-
-# Example files
-examples/chat_prompt/
