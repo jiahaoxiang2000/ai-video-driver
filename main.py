@@ -148,8 +148,9 @@ def generate_multi_repo_content(
         main_output_dir.mkdir(parents=True, exist_ok=True)
 
         generated_videos = []
+        repo_dialogues = []
 
-        # Process each repository
+        # Process each repository and collect dialogues
         for i, repo in enumerate(trending_repos, 1):
             repo_name = repo.get("full_name", f"repo_{i}")
             logger.info(f"Processing repository {i}/5: {repo_name}")
@@ -163,6 +164,9 @@ def generate_multi_repo_content(
                 logger.warning(f"Failed to generate podcast for {repo_name}, skipping")
                 continue
 
+            # Store dialogue for summary generation
+            repo_dialogues.append((repo_name, podcast_dialogue))
+
             # Generate video for this podcast
             video_file = generate_video_for_podcast(
                 podcast_dialogue, repo_name, device, main_output_dir
@@ -174,6 +178,22 @@ def generate_multi_repo_content(
             else:
                 logger.warning(f"Failed to generate video for {repo_name}")
 
+        # Generate summary video from collected dialogues
+        if repo_dialogues:
+            logger.info("Generating summary video from top 5 repositories")
+            summary_dialogue = create_summary_dialogue(repo_dialogues)
+
+            summary_video = generate_video_for_podcast(
+                summary_dialogue, "summary_introduction", device, main_output_dir
+            )
+
+            if summary_video:
+                # Insert summary video at the beginning
+                generated_videos.insert(0, summary_video)
+                logger.info("Successfully generated summary introduction video")
+            else:
+                logger.warning("Failed to generate summary video")
+
         # Combine all videos
         if generated_videos:
             final_combined_video = main_output_dir / "combined_final.mp4"
@@ -183,7 +203,7 @@ def generate_multi_repo_content(
                 logger.info("🎉 MULTI-REPO PIPELINE COMPLETED SUCCESSFULLY!")
                 logger.info(f"📁 Output directory: {main_output_dir}")
                 logger.info(f"🎬 Combined video: {final_combined_video}")
-                logger.info(f"📊 Generated {len(generated_videos)} individual videos")
+                logger.info(f"📊 Generated {len(generated_videos)} total videos (including summary)")
                 print(f"\n🎬 Final combined video: {final_combined_video}")
                 print(f"📁 All files: {main_output_dir}")
                 return True
@@ -252,6 +272,71 @@ def convert_repo_to_podcast(
     except Exception as e:
         logger.error(f"Failed to convert repository to podcast: {e}")
         return get_default_dialogue()
+
+
+def create_summary_dialogue(repo_dialogues: List[tuple]) -> List[str]:
+    """Create a summary dialogue from multiple repository dialogues using AI"""
+    logger = setup_pipeline_logging()
+
+    try:
+        # Initialize PodcastConverter for AI generation
+        converter = PodcastConverter()
+
+        if not converter.check_api_availability():
+            logger.warning("AI API not available, using fallback summary")
+            return _create_fallback_summary(repo_dialogues)
+
+        # Prepare summary content from all repo dialogues
+        summary_content = _prepare_summary_content(repo_dialogues)
+
+        # Generate AI summary dialogue
+        summary_dialogue = converter._generate_summary_dialogue(summary_content)
+
+        if summary_dialogue and converter.validate_dialogue_format(summary_dialogue):
+            logger.info(f"Successfully generated AI summary with {len(summary_dialogue)} segments")
+            return summary_dialogue
+        else:
+            logger.warning("AI summary generation failed, using fallback")
+            return _create_fallback_summary(repo_dialogues)
+
+    except Exception as e:
+        logger.error(f"Failed to create AI summary dialogue: {e}")
+        return _create_fallback_summary(repo_dialogues)
+
+
+def _prepare_summary_content(repo_dialogues: List[tuple]) -> Dict[str, str]:
+    """Prepare content for summary generation"""
+    repo_names = [repo_name for repo_name, _ in repo_dialogues]
+
+    # Extract key points from each dialogue
+    repo_summaries = []
+    for repo_name, dialogue in repo_dialogues:
+        # Take first few dialogue segments as key points
+        key_points = dialogue[:3] if len(dialogue) >= 3 else dialogue
+        repo_summaries.append(f"Repository: {repo_name}\nKey discussion points: {' '.join(key_points)}")
+
+    summary_content = {
+        "name": "GitHub Top 5 Trending Repositories Summary",
+        "description": f"Summary of top 5 trending repositories: {', '.join(repo_names)}",
+        "readme": "\n\n".join(repo_summaries)
+    }
+
+    return summary_content
+
+
+def _create_fallback_summary(repo_dialogues: List[tuple]) -> List[str]:
+    """Fallback summary when AI generation fails"""
+    repo_names = [repo_name for repo_name, _ in repo_dialogues]
+
+    summary_dialogue = [
+        "[S1]欢迎收听今天的GitHub热门项目podcast！今天我们将为大家介绍5个最受关注的开源项目。",
+        "[S2]听起来很exciting啊！都有哪些有趣的项目呢？",
+        f"[S1]今天我们会深入了解{', '.join(repo_names[:3])}等项目，它们各有特色，涵盖了不同的技术领域。",
+        "[S2]太好了！让我们一起来探索这些amazing的开源项目吧！",
+        "[S1]没错，接下来我们就逐一介绍这些项目，相信你们会有很多收获。Let's get started!",
+    ]
+
+    return summary_dialogue
 
 
 def create_fallback_dialogue(repo_info: Dict[str, Any]) -> List[str]:

@@ -87,6 +87,92 @@ class PodcastConverter:
             logger.error(f"Failed to convert content to podcast: {e}")
             return None
 
+    def _generate_summary_dialogue(
+        self, summary_content: Dict[str, str]
+    ) -> Optional[List[str]]:
+        """Generate a summary dialogue introducing multiple repositories"""
+        logger.info("Generating AI summary dialogue from multiple repositories")
+
+        try:
+            # Create specialized summary prompts
+            system_prompt, user_prompt = self._create_summary_prompt(summary_content)
+
+            # Use OpenAI API to generate summary dialogue
+            messages = [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
+            ]
+            response = self.client.chat.completions.create(
+                model=self.model, messages=messages, temperature=1.5
+            )
+
+            if response.choices and response.choices[0].message.content:
+                # Parse the API response to extract dialogue
+                dialogue = self._parse_dialogue_response(
+                    response.choices[0].message.content
+                )
+                if dialogue:
+                    logger.info(
+                        f"Successfully generated summary dialogue with {len(dialogue)} segments"
+                    )
+                    return dialogue
+                else:
+                    logger.error("Failed to parse summary dialogue from API response")
+                    return None
+            else:
+                logger.error("API returned empty response for summary")
+                return None
+        except Exception as e:
+            logger.error(f"Failed to generate summary dialogue: {e}")
+            return None
+
+    def _create_summary_prompt(
+        self, summary_content: Dict[str, str]
+    ) -> tuple[str, str]:
+        """Create specialized prompts for summary dialogue generation"""
+
+        system_prompt = """You are a podcast host creating an engaging introduction for a tech podcast episode about GitHub's top trending repositories.
+
+Instructions:
+- Generate 4-6 dialogue exchanges (8-12 total segments) for an introduction
+- Format each speaker line as: [S1]Text here or [S2]Text here
+- Use natural Chinese mixed with English technical terms
+- S1 should be the main host introducing the episode and repositories
+- S2 should be co-host asking engaging questions and showing excitement
+- Keep each segment under 200 characters for TTS performance
+- Create an engaging introduction that previews what listeners will learn
+- Mention the repository names and hint at their key features
+- Make it sound enthusiastic and welcoming
+- End with a smooth transition to the detailed discussions
+
+Output only the dialogue lines in the specified format, one per line. Do not include any other text or explanations.
+
+Example style:
+[S1]...
+[S2]...
+[S1]..."""
+
+        repo_names = summary_content.get("description", "")
+        repo_summaries = summary_content.get("readme", "")
+
+        user_prompt = f"""Create an engaging podcast introduction for these top trending GitHub repositories:
+
+{repo_names}
+
+Key points from each repository:
+{repo_summaries}
+
+Generate a welcoming introduction dialogue that:
+1. Welcomes listeners to the podcast
+2. Introduces today's topic (top 5 trending repos)
+3. Briefly mentions what makes these repositories interesting
+4. Creates excitement for the detailed discussions to follow
+5. Ends with a smooth transition
+
+Make it sound natural and engaging for a tech podcast audience."""
+
+        return system_prompt, user_prompt
+
     def _create_conversion_prompt(
         self, repo_content: Dict[str, str], style: str, length: str
     ) -> tuple[str, str]:

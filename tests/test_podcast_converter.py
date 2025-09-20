@@ -132,6 +132,45 @@ This is a response without speaker tag.
         is_valid = self.converter.validate_dialogue_format(dialogue)
         self.assertFalse(is_valid)
 
+    def test_generate_summary_dialogue(self):
+        """Test summary dialogue generation from multiple repositories"""
+        summary_content = {
+            "name": "GitHub Top 5 Trending Repositories Summary",
+            "description": "Summary of top 5 trending repositories: DeepResearch, FireRedTTS2, Claude-Code, React-Native, TensorFlow",
+            "readme": """Repository: DeepResearch
+Key discussion points: [S1]今天我们来聊聊一个很厉害的AI model叫DeepResearch。 [S2]听起来很有意思，这个model有什么特别的地方呢？ [S1]这个model有30.5 billion parameters，但是每个token只activate 3.3 billion，专门designed for long-horizon information-seeking tasks。
+
+Repository: FireRedTTS2
+Key discussion points: [S1]接下来我们聊聊FireRedTTS2，这是一个很powerful的TTS system。 [S2]TTS是什么意思啊？ [S1]TTS就是Text-to-Speech，FireRedTTS2可以generate multi-speaker dialogue，而且support超过3分钟的conversational speech。
+
+Repository: Claude-Code
+Key discussion points: [S1]然后我们来看看Claude-Code，这是Anthropic推出的coding assistant。 [S2]这个跟其他的coding tools有什么不同吗？ [S1]Claude-Code integrated了很多advanced features，可以help developers write better code with AI assistance。""",
+        }
+
+        dialogue = self.converter._generate_summary_dialogue(summary_content)
+        print("Generated summary dialogue:")
+        if dialogue:
+            for i, line in enumerate(dialogue, 1):
+                print(f"{i}: {line}")
+        else:
+            print("No summary dialogue generated")
+
+        # Should either get real AI response or None (if API fails)
+        if dialogue is not None:
+            self.assertGreater(len(dialogue), 0)
+            # All lines should have speaker tags
+            self.assertTrue(
+                all(
+                    line.startswith("[S1]") or line.startswith("[S2]")
+                    for line in dialogue
+                )
+            )
+            # Should validate format
+            self.assertTrue(self.converter.validate_dialogue_format(dialogue))
+            # Should be reasonably sized for an introduction
+            self.assertGreaterEqual(len(dialogue), 4)  # At least 4 segments
+            self.assertLessEqual(len(dialogue), 15)  # Not too many for intro
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
