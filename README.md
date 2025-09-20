@@ -7,12 +7,18 @@
 
     <a href="https://github.com/jiahaoxiang2000/ai-video-driver"><img src="https://img.shields.io/badge/GitHub-Repository-blue" alt="GitHub repo"></a>
     <a href="https://github.com/jiahaoxiang2000/ai-video-driver"><img src="https://img.shields.io/badge/License-Apache%202.0-blue.svg" alt="Apache-2.0"></a>
-    <a href="#"><img src="https://img.shields.io/badge/Python-3.9%2B-blue" alt="Python 3.9+"></a>
 </div>
 
 ## What is AI Video Driver?
 
 AI Video Driver automatically transforms text content into professional videos with synchronized speech and animations. Whether you're creating educational content, podcasts, or presentations, this tool handles the entire pipeline from text input to final video output.
+
+**See the AI Video Driver in action:**
+<div align="center">
+
+<https://github.com/user-attachments/assets/f1096b94-f340-48cb-8d62-006c6f91a90d>
+
+</div>
 
 ### Key Capabilities
 
@@ -45,5 +51,3 @@ The AI Video Driver processes your content through an intelligent pipeline:
 2. **Speech Generation**: Uses FireRedTTS-2 to create natural, multi-speaker audio
 3. **Video Creation**: Generates synchronized visual scenes using Manim animation library
 4. **Final Assembly**: Combines audio, video, and subtitles into a polished final product
-
-

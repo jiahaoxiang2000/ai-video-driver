@@ -10,7 +10,6 @@ pretrained_models/
 output/
 outputs/
 temp/
-*.mp4
 *.srt
 
 # Logs
