@@ -14,3 +14,7 @@ temp/
 
 # Logs
 logs/
+
+audio/*
+!audio/S1.wav
+!audio/S2.wav

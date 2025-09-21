@@ -28,13 +28,20 @@ from ai_video_driver.podcast_converter import PodcastConverter
 
 # Global voice prompt configuration
 PROMPT_WAV_LIST = [
-    "audio/S1.wav",
+    "audio/S1.flac",
     "audio/S2.wav",
 ]
 
+# "audio/S1.wav", ourself
+# "[S1]然后，额外再讲一下，就是他有一个，这个，他这个插件有一个可以自定义它的一个json",
+
+# "audio/mid-man.wav"
+# "[S1]那我这里主要是focus的是英文podcast，那很多观众听到这里可能会觉得自己英文水平不好，不敢收听纯英文节目,那这里我想告诉你",
+
+
 PROMPT_TEXT_LIST = [
-    "[S1]然后，额外再讲一下，就是他有一个，这个，他这个插件有一个可以自定义它的一个json",
-    "[S2]从剧场转影视之后有什么差别，然后你的适应呀等等，你觉得你做了什么样的调试",
+    "[S1]啊，可能说更适合美国市场应该是什么样子。那这这个可能说，当然如果说有有机会能亲身的去考察去了解一下，那当然是有更好的帮助。",
+    "[S2]从剧场转影视之后有什么差别，然后你的适应呀等等，你觉得你做了什么样的调试。",
 ]
 
 
@@ -203,7 +210,9 @@ def generate_multi_repo_content(
                 logger.info("🎉 MULTI-REPO PIPELINE COMPLETED SUCCESSFULLY!")
                 logger.info(f"📁 Output directory: {main_output_dir}")
                 logger.info(f"🎬 Combined video: {final_combined_video}")
-                logger.info(f"📊 Generated {len(generated_videos)} total videos (including summary)")
+                logger.info(
+                    f"📊 Generated {len(generated_videos)} total videos (including summary)"
+                )
                 print(f"\n🎬 Final combined video: {final_combined_video}")
                 print(f"📁 All files: {main_output_dir}")
                 return True
@@ -293,7 +302,9 @@ def create_summary_dialogue(repo_dialogues: List[tuple]) -> List[str]:
         summary_dialogue = converter._generate_summary_dialogue(summary_content)
 
         if summary_dialogue and converter.validate_dialogue_format(summary_dialogue):
-            logger.info(f"Successfully generated AI summary with {len(summary_dialogue)} segments")
+            logger.info(
+                f"Successfully generated AI summary with {len(summary_dialogue)} segments"
+            )
             return summary_dialogue
         else:
             logger.warning("AI summary generation failed, using fallback")
@@ -313,12 +324,14 @@ def _prepare_summary_content(repo_dialogues: List[tuple]) -> Dict[str, str]:
     for repo_name, dialogue in repo_dialogues:
         # Take first few dialogue segments as key points
         key_points = dialogue[:3] if len(dialogue) >= 3 else dialogue
-        repo_summaries.append(f"Repository: {repo_name}\nKey discussion points: {' '.join(key_points)}")
+        repo_summaries.append(
+            f"Repository: {repo_name}\nKey discussion points: {' '.join(key_points)}"
+        )
 
     summary_content = {
         "name": "GitHub Top 5 Trending Repositories Summary",
         "description": f"Summary of top 5 trending repositories: {', '.join(repo_names)}",
-        "readme": "\n\n".join(repo_summaries)
+        "readme": "\n\n".join(repo_summaries),
     }
 
     return summary_content
