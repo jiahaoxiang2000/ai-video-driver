@@ -155,6 +155,7 @@ def generate_multi_repo_content(
         main_output_dir.mkdir(parents=True, exist_ok=True)
 
         generated_videos = []
+        video_titles = []
         repo_dialogues = []
 
         # Process each repository and collect dialogues
@@ -181,6 +182,7 @@ def generate_multi_repo_content(
 
             if video_file:
                 generated_videos.append(video_file)
+                video_titles.append(repo_name)
                 logger.info(f"Successfully generated video {i}/5 for {repo_name}")
             else:
                 logger.warning(f"Failed to generate video for {repo_name}")
@@ -197,6 +199,7 @@ def generate_multi_repo_content(
             if summary_video:
                 # Insert summary video at the beginning
                 generated_videos.insert(0, summary_video)
+                video_titles.insert(0, "intro")
                 logger.info("Successfully generated summary introduction video")
             else:
                 logger.warning("Failed to generate summary video")
@@ -204,7 +207,7 @@ def generate_multi_repo_content(
         # Combine all videos
         if generated_videos:
             final_combined_video = main_output_dir / "combined_final.mp4"
-            success = combine_videos(generated_videos, final_combined_video)
+            success = combine_videos(generated_videos, final_combined_video, video_titles)
 
             if success:
                 logger.info("🎉 MULTI-REPO PIPELINE COMPLETED SUCCESSFULLY!")
@@ -449,8 +452,8 @@ def generate_video_for_podcast(
         return None
 
 
-def combine_videos(video_files: List[Path], output_file: Path) -> bool:
-    """Combine multiple videos into one final video"""
+def combine_videos(video_files: List[Path], output_file: Path, video_titles: Optional[List[str]] = None) -> bool:
+    """Combine multiple videos into one final video and generate timestamp descriptions"""
     logger = setup_pipeline_logging()
 
     try:
@@ -469,7 +472,16 @@ def combine_videos(video_files: List[Path], output_file: Path) -> bool:
 
             shutil.copy2(valid_videos[0], output_file)
             logger.info(f"Single video copied to {output_file}")
+
+            # Generate simple timestamp for single video
+            _generate_single_video_timestamps(output_file, valid_videos[0], video_titles)
             return True
+
+        # Get video durations for timestamp generation
+        video_durations = []
+        for video in valid_videos:
+            duration = _get_video_duration(video)
+            video_durations.append(duration)
 
         # Create a text file listing all videos for ffmpeg
         concat_file = output_file.parent / "concat_list.txt"
@@ -501,6 +513,10 @@ def combine_videos(video_files: List[Path], output_file: Path) -> bool:
             logger.info(
                 f"Successfully combined {len(valid_videos)} videos into {output_file}"
             )
+
+            # Generate timestamp descriptions
+            _generate_video_timestamps(output_file, valid_videos, video_durations, video_titles)
+
             return True
         else:
             logger.error(f"FFmpeg failed to combine videos: {result.stderr}")
@@ -509,6 +525,128 @@ def combine_videos(video_files: List[Path], output_file: Path) -> bool:
     except Exception as e:
         logger.error(f"Failed to combine videos: {e}")
         return False
+
+
+def _get_video_duration(video_path: Path) -> float:
+    """Get video duration in seconds using ffprobe"""
+    try:
+        import subprocess
+
+        cmd = [
+            "ffprobe",
+            "-v", "quiet",
+            "-print_format", "json",
+            "-show_format",
+            str(video_path)
+        ]
+
+        result = subprocess.run(cmd, capture_output=True, text=True)
+
+        if result.returncode == 0:
+            import json
+            data = json.loads(result.stdout)
+            duration = float(data["format"]["duration"])
+            return duration
+        else:
+            return 0.0
+
+    except Exception:
+        return 0.0
+
+
+def _format_timestamp(seconds: float) -> str:
+    """Format seconds to MM:SS timestamp"""
+    minutes = int(seconds // 60)
+    seconds = int(seconds % 60)
+    return f"{minutes:02d}:{seconds:02d}"
+
+
+def _generate_video_timestamps(output_file: Path, video_files: List[Path], durations: List[float], titles: Optional[List[str]] = None) -> None:
+    """Generate timestamp descriptions for combined video"""
+    logger = setup_pipeline_logging()
+
+    try:
+        timestamp_file = output_file.parent / "timestamps.txt"
+
+        current_time = 0.0
+        timestamps = []
+
+        for i, (video_file, duration) in enumerate(zip(video_files, durations)):
+            # Extract title from video filename or use provided titles
+            if titles and i < len(titles):
+                title = titles[i]
+            else:
+                # Extract meaningful title from filename
+                title = _extract_title_from_filename(video_file)
+
+            timestamp_str = _format_timestamp(current_time)
+            timestamps.append(f"{timestamp_str} {title}")
+
+            current_time += duration
+
+        # Write timestamps to file
+        with open(timestamp_file, "w", encoding="utf-8") as f:
+            f.write("视频时间轴:\n\n")
+            for timestamp in timestamps:
+                f.write(f"{timestamp}\n")
+
+        logger.info(f"Generated video timestamps: {timestamp_file}")
+
+        # Also print to console for immediate visibility
+        print(f"\n📝 视频时间轴:")
+        for timestamp in timestamps:
+            print(f"   {timestamp}")
+        print(f"📄 完整时间轴文件: {timestamp_file}")
+
+    except Exception as e:
+        logger.error(f"Failed to generate video timestamps: {e}")
+
+
+def _generate_single_video_timestamps(output_file: Path, video_file: Path, titles: Optional[List[str]] = None) -> None:
+    """Generate timestamp for single video"""
+    logger = setup_pipeline_logging()
+
+    try:
+        timestamp_file = output_file.parent / "timestamps.txt"
+
+        # Extract title from video filename or use provided title
+        if titles and len(titles) > 0:
+            title = titles[0]
+        else:
+            title = _extract_title_from_filename(video_file)
+
+        with open(timestamp_file, "w", encoding="utf-8") as f:
+            f.write("视频时间轴:\n\n")
+            f.write(f"00:00 {title}\n")
+
+        logger.info(f"Generated single video timestamp: {timestamp_file}")
+
+        print(f"\n📝 视频时间轴:")
+        print(f"   00:00 {title}")
+        print(f"📄 时间轴文件: {timestamp_file}")
+
+    except Exception as e:
+        logger.error(f"Failed to generate single video timestamp: {e}")
+
+
+def _extract_title_from_filename(video_file: Path) -> str:
+    """Extract meaningful title from video filename"""
+    filename = video_file.stem
+
+    # Handle different naming patterns
+    if "summary" in filename.lower():
+        return "intro"
+    elif "repo_" in filename:
+        # Extract repo name from filename like "repo_user_project_final"
+        parts = filename.split("_")
+        if len(parts) >= 3:
+            repo_name = "_".join(parts[1:-1])  # Remove 'repo_' prefix and '_final' suffix
+            return repo_name.replace("_", "/")
+        else:
+            return filename.replace("repo_", "").replace("_", " ")
+    else:
+        # Clean up filename
+        return filename.replace("_", " ").title()
 
 
 def parse_arguments():
